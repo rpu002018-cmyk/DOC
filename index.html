@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admission Document Acknowledgement - Wizard UI</title>
+
+  <style>
+    :root{
+      --bg:#081424; --card:#0f2130; --muted:#9fb3d1; --accent:#0ea5e9;
+      --success:#16a34a; --danger:#ef4444; --glass: rgba(255,255,255,0.03);
+      --border: rgba(255,255,255,0.06); --surface:#071322; --text:#e6eef8;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;color:var(--text);background:linear-gradient(180deg,var(--bg),#041523);-webkit-font-smoothing:antialiased}
+    .wrap{max-width:1100px;margin:28px auto;padding:18px}
+    /* Top sliding bar (hidden while in-step unless logged-in) */
+    .topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:10px;background:linear-gradient(90deg,#062133,#0b2b3f);box-shadow:0 6px 22px rgba(2,6,23,0.6);border:1px solid var(--border);transition:all .25s}
+    .topbar.hidden{opacity:0;transform:translateY(-14px);height:0;padding:0 16px;border:none;overflow:hidden}
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{width:46px;height:46;border-radius:10px;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:800}
+    .h1{font-weight:800}
+    .chip{background:var(--glass);padding:6px 10px;border-radius:999px;font-weight:700;color:var(--muted);border:1px solid rgba(255,255,255,0.02)}
+    /* Wizard card */
+    .card{background:linear-gradient(180deg,var(--card), rgba(255,255,255,0.02));padding:18px;border-radius:12px;margin-top:16px;border:1px solid var(--border);box-shadow:0 14px 40px rgba(2,6,23,0.6)}
+    .stepper{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+    .step{padding:8px 12px;border-radius:999px;background:var(--glass);font-weight:800;color:var(--muted);font-size:13px;border:1px solid rgba(255,255,255,0.02)}
+    .step.active{background:linear-gradient(90deg,var(--accent),#7c3aed);color:#001428}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media(max-width:860px){.grid{grid-template-columns:1fr}}
+    label{display:block;font-size:13px;margin-bottom:6px;color:var(--muted)}
+    input[type="text"], input[type="search"], input[type="email"], select {
+      width:100%; padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);
+    }
+    input[type="password"]{width:100%; padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text)}
+    .row{display:flex;gap:8px;align-items:center}
+    .btn{padding:10px 14px;border-radius:8px;border:0;cursor:pointer;font-weight:800}
+    .btn.primary{background:var(--accent);color:#001428}
+    .btn.ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+    .muted{color:var(--muted)}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{padding:8px;border-bottom:1px dashed rgba(255,255,255,0.03);text-align:left}
+    .right{margin-left:auto}
+    .footer-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+    .small{font-size:13px;color:var(--muted)}
+    .locked{opacity:0.6}
+    /* mandatory field indicator */
+    .req::after{content:" *";color:var(--danger)}
+    /* modal */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(2,6,23,0.6);display:none;align-items:center;justify-content:center;z-index:60}
+    .modal{background:var(--surface);padding:18px;border-radius:10px;border:1px solid var(--border);width:720px;max-width:92%}
+    /* Issued Documents Mode Styles */
+    .mode-tabs{display:flex;gap:8px;margin-bottom:16px}
+    .mode-tab{padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-weight:700;transition:all .25s}
+    .mode-tab.active{background:var(--accent);color:#001428}
+    .issued-docs-section{margin-top:16px;display:none}
+    .issued-docs-section.active{display:block}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div id="topbar" class="topbar hidden">
+      <div class="brand">
+        <div class="logo">AD</div>
+        <div>
+          <div class="h1">Admission Documents</div>
+          <div class="small muted">Acknowledgement System</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <div id="operatorChip" class="chip">Not signed in</div>
+        <button id="logoutBtn" class="btn ghost" style="display:none">Logout</button>
+      </div>
+    </div>
+
+    <div class="card" id="wizardCard">
+      <div class="stepper" id="stepper">
+        <div class="step active" data-step="1">1. Login</div>
+        <div class="step" data-step="2">2. Student</div>
+        <div class="step" data-step="3">3. Mode</div>
+        <div class="step" data-step="4">4. Confirm</div>
+      </div>
+
+      <!-- STEP 1: Login -->
+      <div id="step-1" class="step-pane">
+        <h3>Operator Login</h3>
+        <div class="grid" style="margin-top:12px">
+          <div>
+            <label class="req">Operator ID</label>
+            <input id="operatorId" type="text" autocomplete="username">
+          </div>
+          <div>
+            <label class="req">Password</label>
+            <input id="password" type="password" autocomplete="current-password">
+          </div>
+        </div>
+
+        <div class="footer-actions">
+          <div class="right">
+            <button id="loginNext" class="btn primary">Next</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2: Student Search / Register -->
+      <div id="step-2" class="step-pane" style="display:none">
+        <h3>Find or Register Student</h3>
+
+        <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+          <div style="flex:1">
+            <label class="req">Register No or Application No</label>
+            <input id="searchInput" type="search" placeholder="Enter Register No or Application No">
+          </div>
+          <div style="width:140px">
+            <label class="req">&nbsp;</label>
+            <button id="searchBtn" class="btn primary" style="width:100%">Search</button>
+          </div>
+        </div>
+
+        <div style="margin-top:12px; display:flex;gap:10px;align-items:center">
+          <button id="openRegister" class="btn ghost">Register New Student</button>
+          <div id="searchMessage" class="small muted"></div>
+        </div>
+
+        <div id="studentSummary" style="margin-top:16px;display:none">
+          <h4>Student Details</h4>
+          <div id="studentInfo" class="small muted"></div>
+        </div>
+
+        <div class="footer-actions">
+          <button id="backToLogin" class="btn ghost">Back</button>
+          <button id="studentNext" class="btn primary">Next</button>
+        </div>
+      </div>
+
+      <!-- STEP 3: Select Mode (Received or Issued) -->
+      <div id="step-3" class="step-pane" style="display:none">
+        <h3>Select Document Mode</h3>
+
+        <div class="mode-tabs">
+          <button class="mode-tab active" data-mode="received" id="modeReceived">Received Documents</button>
+          <button class="mode-tab" data-mode="issued" id="modeIssued">Issued Documents</button>
+        </div>
+
+        <!-- RECEIVED DOCUMENTS MODE -->
+        <div id="received-mode" class="issued-docs-section active">
+          <h4>Document Checklist - Received</h4>
+          <div class="small muted">Receiver (fixed for already received documents will not change): <b id="fixedReceiver" class="muted"></b></div>
+
+          <table id="docTable">
+            <thead>
+              <tr><th>Document</th><th>Original</th><th>Xerox</th><th>Status</th><th>Submitted By</th><th>Date</th><th>Received By</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+
+          <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+            <div>
+              <label class="req">Submitted By (default)</label>
+              <select id="globalSubmittedBy">
+                <option>Father</option><option>Mother</option><option>Brother</option><option>Sister</option><option>Self</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- ISSUED DOCUMENTS MODE -->
+        <div id="issued-mode" class="issued-docs-section">
+          <h4>Document Issuance</h4>
+          
+          <table id="issuedDocTable">
+            <thead>
+              <tr><th>Document</th><th>Quantity</th><th>Received By</th><th>Issued To</th><th>Remarks</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+
+          <div style="margin-top:16px;padding:12px;background:var(--glass);border-radius:8px">
+            <h4>Add New Issued Document</h4>
+            <div class="grid" style="margin-top:12px">
+              <div>
+                <label class="req">Document Name</label>
+                <select id="issuedDocName">
+                  <option value="">-- Select Document --</option>
+                </select>
+              </div>
+              <div>
+                <label class="req">Quantity</label>
+                <input id="issuedDocQty" type="number" min="1" value="1">
+              </div>
+              <div>
+                <label class="req">Received By (Purpose)</label>
+                <input id="issuedReceivedBy" type="text" placeholder="e.g., Student, Parent">
+              </div>
+              <div>
+                <label>Issued To</label>
+                <input id="issuedIssuedTo" type="text" placeholder="e.g., Student Name / ID">
+              </div>
+            </div>
+            <div>
+              <label>Remarks</label>
+              <input id="issuedRemarks" type="text" placeholder="Additional notes">
+            </div>
+            <div class="footer-actions" style="margin-top:8px">
+              <button id="addIssuedBtn" class="btn primary">Add Document</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer-actions">
+          <button id="backToStudent2" class="btn ghost">Back</button>
+          <button id="modeNext" class="btn primary">Next</button>
+        </div>
+      </div>
+
+      <!-- STEP 4: Confirm -->
+      <div id="step-4" class="step-pane" style="display:none">
+        <h3>Confirm & Save</h3>
+        <div id="confirmArea" class="small muted" style="margin-top:12px"></div>
+
+        <div class="footer-actions">
+          <button id="backToMode" class="btn ghost">Back</button>
+          <button id="saveComplete" class="btn primary">Save & Send Acknowledgement</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Register Modal -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal">
+      <h3>Register Student</h3>
+      <div class="grid" style="margin-top:12px">
+        <div>
+          <label class="req">Register No</label>
+          <input id="reg_regno" type="text">
+        </div>
+        <div>
+          <label class="req">Application No</label>
+          <input id="reg_appno" type="text">
+        </div>
+        <div>
+          <label class="req">Name</label>
+          <input id="reg_name" type="text">
+        </div>
+        <div>
+          <label>Section</label>
+          <input id="reg_section" type="text">
+        </div>
+        <div>
+          <label>Sub-Section</label>
+          <input id="reg_subsection" type="text">
+        </div>
+        <div>
+          <label>Email</label>
+          <input id="reg_email" type="email">
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+        <button id="regCancel" class="btn ghost">Cancel</button>
+        <button id="regSave" class="btn primary">Register</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Client-side logic: strict wizard, mandatory fields, receiver preservation
+    const steps = [1,2,3,4];
+    let currentStep = 1;
+    let currentMode = 'received'; // 'received' or 'issued'
+    let OPERATOR = null;
+    let STUDENT = null;
+    let UI_DOCS = [];
+    let UI_ISSUED_DOCS = [];
+    
+    const DOCUMENT_TYPES = [
+      "10TH Hall Ticket Xerox",
+      "10TH marks sheet Original",
+      "10TH marks sheet Xerox",
+      "Transfer Certificate Original",
+      "Transfer Certificate Xerox",
+      "Migration Certificate Original",
+      "Migration Certificate Xerox",
+      "Student Photo",
+      "Caste Certificate Xerox",
+      "Aadhar Card Student Xerox",
+      "Aadhar Card Mother Xerox",
+      "Aadhar Card Father Xerox",
+      "Study Certificate Xerox"
+    ];
+
+    // DOM helpers
+    const $ = id => document.getElementById(id);
+    const show = el => el.style.display = '';
+    const hide = el => el.style.display = 'none';
+    
+    const setStepUI = (n) => {
+      currentStep = n;
+      // step panes
+      steps.forEach(s => {
+        const pane = $('step-' + s);
+        if (s === n) pane.style.display = '';
+        else pane.style.display = 'none';
+        const stepEl = [...document.querySelectorAll('.step')].find(x => +x.dataset.step === s);
+        if (stepEl) {
+          if (s === n) stepEl.classList.add('active'); else stepEl.classList.remove('active');
+        }
+      });
+      // topbar shown only when logged in and not hidden requirement
+      const top = $('topbar');
+      if (OPERATOR && currentStep > 1) top.classList.remove('hidden'); else top.classList.add('hidden');
+    };
+
+    // Initialize
+    setStepUI(1);
+    populateIssuedDocDropdown();
+
+    // Login step
+    $('loginNext').addEventListener('click', () => {
+      const id = $('operatorId').value.trim();
+      const pwd = $('password').value.trim();
+      if (!id || !pwd) { alert('Operator ID and Password are required'); return; }
+      // call server validateOperator
+      google.script.run.withSuccessHandler(res => {
+        if (!res || !res.success) { alert('Invalid credentials'); return; }
+        OPERATOR = { id: id, name: res.name || id };
+        $('operatorChip').innerText = OPERATOR.name;
+        $('logoutBtn').style.display = '';
+        setStepUI(2);
+      }).validateOperator(id, pwd);
+    });
+
+    // Logout: clear state and return to login step (no reload)
+    $('logoutBtn').addEventListener('click', () => {
+      if (!confirm('Logout?')) return;
+      OPERATOR = null;
+      STUDENT = null;
+      UI_DOCS = [];
+      UI_ISSUED_DOCS = [];
+      $('operatorChip').innerText = 'Not signed in';
+      $('logoutBtn').style.display = 'none';
+      // clear fields
+      $('operatorId').value = '';
+      $('password').value = '';
+      $('searchInput').value = '';
+      $('studentInfo').innerText = '';
+      $('studentSummary').style.display = 'none';
+      $('docTable').querySelector('tbody').innerHTML = '';
+      $('issuedDocTable').querySelector('tbody').innerHTML = '';
+      setStepUI(1);
+      currentMode = 'received';
+      setModeUI('received');
+    });
+
+    // Student search
+    $('searchBtn').addEventListener('click', doSearch);
+    function doSearch(){
+      if (!OPERATOR) { alert('Login required'); setStepUI(1); return; }
+      const q = $('searchInput').value.trim();
+      if (!q) { alert('Enter Register No or Application No'); return; }
+      google.script.run.withSuccessHandler(res => {
+        if (!res) { $('searchMessage').innerText = 'Not found'; $('studentSummary').style.display='none'; STUDENT=null; return; }
+        STUDENT = res;
+        $('studentInfo').innerText = `Name: ${STUDENT.name}\nApplication: ${STUDENT.applicationNo}\nSection: ${STUDENT.section || ''} ${STUDENT.subSection || ''}\nEmail: ${STUDENT.email || ''}`;
+        $('studentSummary').style.display = '';
+        $('searchMessage').innerText = 'Student loaded';
+      }).searchStudent(q);
+    }
+
+    // Register new student modal
+    $('openRegister').addEventListener('click', ()=> $('modalBackdrop').style.display = 'flex');
+    $('regCancel').addEventListener('click', ()=> $('modalBackdrop').style.display = 'none');
+    $('regSave').addEventListener('click', () => {
+      const stud = {
+        registerNo: $('reg_regno').value.trim(),
+        applicationNo: $('reg_appno').value.trim(),
+        name: $('reg_name').value.trim(),
+        section: $('reg_section').value.trim(),
+        subSection: $('reg_subsection').value.trim(),
+        email: $('reg_email').value.trim()
+      };
+      if (!stud.registerNo || !stud.applicationNo || !stud.name) { alert('Register No, Application No and Name are mandatory'); return; }
+      google.script.run.withSuccessHandler(res=>{
+        if (!res || !res.success) { alert('Register failed: ' + (res && res.error ? res.error : 'Unknown')); return; }
+        alert('Student registered successfully');
+        $('modalBackdrop').style.display = 'none';
+        // auto-fill search input and load
+        $('searchInput').value = stud.applicationNo;
+        doSearch();
+      }).addStudent(stud);
+    });
+
+    // Navigation: Back/Next in Student step
+    $('backToLogin').addEventListener('click', ()=> setStepUI(1));
+    $('studentNext').addEventListener('click', ()=> {
+      if (!OPERATOR) { alert('Login required'); setStepUI(1); return; }
+      if (!STUDENT) { alert('Please search and select a student or register one'); return; }
+      // Load existing documents and issued documents
+      google.script.run.withSuccessHandler(res => {
+        const existing = res || [];
+        UI_DOCS = DOCUMENT_TYPES.map(name => {
+          const f = (existing || []).find(x => x.name === name) || {};
+          return {
+            name,
+            original: !!f.original,
+            xerox: !!f.xerox,
+            status: f.status || ((!!f.original||!!f.xerox) ? 'Submitted' : 'Pending'),
+            submittedDate: f.submittedDate || '',
+            submittedBy: f.submittedBy || '',
+            receivedBy: f.receivedBy || '',
+            locked: (!!f.original || !!f.xerox)
+          };
+        });
+        renderDocsTable();
+      }).loadExistingDocuments(STUDENT.applicationNo);
+
+      google.script.run.withSuccessHandler(res => {
+        UI_ISSUED_DOCS = res || [];
+        renderIssuedDocsTable();
+        setStepUI(3);
+      }).loadIssuedDocuments(STUDENT.applicationNo);
+    });
+
+    // MODE SELECTION
+    function setModeUI(mode) {
+      currentMode = mode;
+      document.querySelectorAll('.mode-tab').forEach(t => {
+        if (t.dataset.mode === mode) t.classList.add('active');
+        else t.classList.remove('active');
+      });
+      document.querySelectorAll('.issued-docs-section').forEach(s => s.classList.remove('active'));
+      if (mode === 'received') $('received-mode').classList.add('active');
+      else $('issued-mode').classList.add('active');
+    }
+
+    document.querySelectorAll('.mode-tab').forEach(tab => {
+      tab.addEventListener('click', () => setModeUI(tab.dataset.mode));
+    });
+
+    $('backToStudent2').addEventListener('click', ()=> setStepUI(2));
+
+    // Documents step: render received documents table
+    function renderDocsTable(){
+      const tbody = $('docTable').querySelector('tbody');
+      tbody.innerHTML = '';
+      const fixed = UI_DOCS.find(d => d.receivedBy);
+      $('fixedReceiver').innerText = fixed ? fixed.receivedBy : (OPERATOR ? OPERATOR.name : '');
+      UI_DOCS.forEach((d, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = d.locked ? 'locked' : '';
+        tr.innerHTML = `
+          <td>${escapeHtml(d.name)}</td>
+          <td><input type="checkbox" data-type="original" ${d.original ? 'checked' : ''} ${d.locked ? 'disabled' : ''}></td>
+          <td><input type="checkbox" data-type="xerox" ${d.xerox ? 'checked' : ''} ${d.locked ? 'disabled' : ''}></td>
+          <td>${d.status}</td>
+          <td>
+            <select ${d.locked ? 'disabled' : ''} data-submittedby>
+              <option ${d.submittedBy==='Father'?'selected':''}>Father</option>
+              <option ${d.submittedBy==='Mother'?'selected':''}>Mother</option>
+              <option ${d.submittedBy==='Brother'?'selected':''}>Brother</option>
+              <option ${d.submittedBy==='Sister'?'selected':''}>Sister</option>
+              <option ${d.submittedBy==='Self'?'selected':''}>Self</option>
+            </select>
+          </td>
+          <td>${d.submittedDate || ''}</td>
+          <td>${d.receivedBy || ''}</td>
+        `;
+        tr.querySelectorAll('input[type=checkbox]').forEach(cb => {
+          cb.addEventListener('change', (e) => {
+            const type = e.target.dataset.type;
+            if (type === 'original') UI_DOCS[idx].original = e.target.checked;
+            if (type === 'xerox') UI_DOCS[idx].xerox = e.target.checked;
+            UI_DOCS[idx].status = (UI_DOCS[idx].original || UI_DOCS[idx].xerox) ? 'Submitted' : 'Pending';
+            if (UI_DOCS[idx].status === 'Submitted' && !UI_DOCS[idx].submittedDate) {
+              UI_DOCS[idx].submittedDate = new Date().toLocaleDateString();
+              if (!UI_DOCS[idx].submittedBy) UI_DOCS[idx].submittedBy = $('globalSubmittedBy').value;
+            }
+            renderDocsTable();
+          });
+        });
+        tr.querySelector('[data-submittedby]').addEventListener('change', (e) => {
+          UI_DOCS[idx].submittedBy = e.target.value;
+        });
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Issued documents functions
+    function populateIssuedDocDropdown() {
+      google.script.run.withSuccessHandler(docs => {
+        const select = $('issuedDocName');
+        docs.forEach(doc => {
+          const option = document.createElement('option');
+          option.value = doc;
+          option.innerText = doc;
+          select.appendChild(option);
+        });
+      }).getIssuedDocumentsList();
+    }
+
+    function renderIssuedDocsTable() {
+      const tbody = $('issuedDocTable').querySelector('tbody');
+      tbody.innerHTML = '';
+      UI_ISSUED_DOCS.forEach((d, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(d.documentName)}</td>
+          <td>${d.quantity}</td>
+          <td>${escapeHtml(d.purpose)}</td>
+          <td>${escapeHtml(d.issuedTo)}</td>
+          <td>${escapeHtml(d.notes)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    $('addIssuedBtn').addEventListener('click', () => {
+      const docName = $('issuedDocName').value.trim();
+      const qty = parseInt($('issuedDocQty').value) || 1;
+      const receivedBy = $('issuedReceivedBy').value.trim();
+      const issuedTo = $('issuedIssuedTo').value.trim();
+      const remarks = $('issuedRemarks').value.trim();
+
+      if (!docName) { alert('Document name is required'); return; }
+      if (qty < 1) { alert('Quantity must be at least 1'); return; }
+      if (!receivedBy) { alert('Received By (Purpose) is required'); return; }
+
+      UI_ISSUED_DOCS.push({
+        documentName: docName,
+        quantity: qty,
+        purpose: receivedBy,
+        issuedTo: issuedTo,
+        notes: remarks
+      });
+
+      // Clear form
+      $('issuedDocName').value = '';
+      $('issuedDocQty').value = '1';
+      $('issuedReceivedBy').value = '';
+      $('issuedIssuedTo').value = '';
+      $('issuedRemarks').value = '';
+
+      renderIssuedDocsTable();
+    });
+
+    $('modeNext').addEventListener('click', ()=> {
+      if (currentMode === 'received') {
+        // Validate received documents
+        for (let d of UI_DOCS) {
+          if ((d.original || d.xerox) && !d.submittedBy && !$('globalSubmittedBy').value) {
+            alert('All submitted documents must have "Submitted By" set');
+            return;
+          }
+        }
+        const list = UI_DOCS.filter(d => d.original || d.xerox).map(d => `${d.name} (Original:${d.original?'Y':'N'}, Xerox:${d.xerox?'Y':'N'})`);
+        if (list.length === 0) { if (!confirm('No documents selected. Continue?')) return; }
+        $('confirmArea').innerText = `Mode: Received Documents\nStudent: ${STUDENT.name}\nApplication: ${STUDENT.applicationNo}\nDocuments:\n` + (list.join('\n') || 'None');
+      } else {
+        // Validate issued documents
+        if (UI_ISSUED_DOCS.length === 0) {
+          alert('Please add at least one issued document');
+          return;
+        }
+        const list = UI_ISSUED_DOCS.map(d => `${d.documentName} (Qty: ${d.quantity}, Purpose: ${d.purpose})`);
+        $('confirmArea').innerText = `Mode: Issued Documents\nStudent: ${STUDENT.name}\nApplication: ${STUDENT.applicationNo}\nDocuments:\n` + list.join('\n');
+      }
+      setStepUI(4);
+    });
+
+    $('backToMode').addEventListener('click', ()=> setStepUI(3));
+
+    // Final save
+    $('saveComplete').addEventListener('click', () => {
+      if (!OPERATOR) { alert('Login required'); setStepUI(1); return; }
+      if (!STUDENT) { alert('Student required'); setStepUI(2); return; }
+
+      $('saveComplete').disabled = true;
+
+      if (currentMode === 'received') {
+        const payload = {
+          studentName: STUDENT.name,
+          applicationNo: STUDENT.applicationNo,
+          section: STUDENT.section,
+          subSection: STUDENT.subSection,
+          email: STUDENT.email,
+          operatorId: OPERATOR.id,
+          operatorName: OPERATOR.name,
+          documents: UI_DOCS.map(d => ({
+            name: d.name,
+            original: !!d.original,
+            xerox: !!d.xerox,
+            submittedBy: d.submittedBy || $('globalSubmittedBy').value,
+            submittedDate: d.submittedDate || ""
+          }))
+        };
+        google.script.run.withSuccessHandler(res => {
+          $('saveComplete').disabled = false;
+          if (!res || !res.success) { alert('Save failed: ' + (res && res.error ? res.error : 'Unknown')); return; }
+          alert('Saved successfully. Returning to student search.');
+          STUDENT = null;
+          UI_DOCS = [];
+          UI_ISSUED_DOCS = [];
+          $('searchInput').value = '';
+          $('studentSummary').style.display = 'none';
+          $('docTable').querySelector('tbody').innerHTML = '';
+          $('issuedDocTable').querySelector('tbody').innerHTML = '';
+          currentMode = 'received';
+          setModeUI('received');
+          setStepUI(2);
+        }).saveDocuments(payload);
+      } else {
+        // Issued documents mode
+        const payload = {
+          studentName: STUDENT.name,
+          applicationNo: STUDENT.applicationNo,
+          email: STUDENT.email,
+          operatorId: OPERATOR.id,
+          operatorName: OPERATOR.name,
+          documents: UI_ISSUED_DOCS.map(d => ({
+            name: d.documentName,
+            quantity: d.quantity,
+            receivedBy: d.purpose,
+            issuedTo: d.issuedTo,
+            remarks: d.notes
+          }))
+        };
+        google.script.run.withSuccessHandler(res => {
+          $('saveComplete').disabled = false;
+          if (!res || !res.success) { alert('Save failed: ' + (res && res.error ? res.error : 'Unknown')); return; }
+          alert('Issued documents saved successfully (Count: ' + res.documentCount + '). Returning to student search.');
+          STUDENT = null;
+          UI_DOCS = [];
+          UI_ISSUED_DOCS = [];
+          $('searchInput').value = '';
+          $('studentSummary').style.display = 'none';
+          $('docTable').querySelector('tbody').innerHTML = '';
+          $('issuedDocTable').querySelector('tbody').innerHTML = '';
+          currentMode = 'received';
+          setModeUI('received');
+          setStepUI(2);
+        }).saveIssuedDocuments(payload);
+      }
+    });
+
+    // Utility functions
+    function escapeHtml(s){ if(!s) return ''; return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+    // Modal close on clicking backdrop
+    $('modalBackdrop').addEventListener('click', (e) => {
+      if (e.target === $('modalBackdrop')) $('modalBackdrop').style.display = 'none';
+    });
+
+    // Prevent browser autocomplete from exposing password in UI
+    document.querySelectorAll('input').forEach(i => {
+      if (i.id === 'password') { i.setAttribute('autocomplete','current-password'); i.setAttribute('type','password'); }
+    });
+
+  </script>
+</body>
+</html>
