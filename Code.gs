@@ -541,6 +541,115 @@ function saveDocuments(payload){
 }
 
 /***********************
+ * RECEIVED DOCUMENTS EMAIL
+ ***********************/
+function sendAcknowledgementEmail(payload) {
+  if (!payload.email || String(payload.email).trim() === "") {
+    return { success: true };
+  }
+
+  try {
+    const studentName = payload.studentName || "Student";
+    const applicationNo = payload.applicationNo || "N/A";
+    const submissionDate = Utilities.formatDate(new Date(), TZ, DATE_FORMAT);
+    
+    let documentsList = "";
+
+    payload.documents.forEach(d => {
+      const docTypes = [];
+      if (d.original) docTypes.push("Original");
+      if (d.xerox) docTypes.push("Xerox");
+      documentsList += `
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;">${d.name}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;">${docTypes.join(", ") || "-"}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;">${d.submittedBy || "-"}</td>
+        </tr>
+      `;
+    });
+
+    const htmlBody = `
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #2196F3; color: white; padding: 15px; border-radius: 5px; }
+            .content { padding: 20px 0; }
+            .table-container { margin: 20px 0; }
+            table { width: 100%; border-collapse: collapse; }
+            th { background-color: #f2f2f2; padding: 10px; text-align: left; border-bottom: 2px solid #ddd; }
+            .footer { color: #666; font-size: 12px; margin-top: 20px; border-top: 1px solid #ddd; padding-top: 10px; }
+            .info-box { background-color: #f9f9f9; padding: 10px; border-left: 4px solid #2196F3; margin: 10px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h2>Document Receipt Acknowledgement</h2>
+            </div>
+            
+            <div class="content">
+              <p>Dear <strong>${studentName}</strong>,</p>
+              
+              <p>This is to acknowledge receipt of the following documents submitted for your admission.</p>
+              
+              <div class="info-box">
+                <p><strong>Application No:</strong> ${applicationNo}</p>
+                <p><strong>Submission Date:</strong> ${submissionDate}</p>
+                <p><strong>Received By:</strong> ${payload.operatorName || "-"}</p>
+              </div>
+              
+              <div class="table-container">
+                <h3>Submitted Documents:</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Document Name</th>
+                      <th>Type</th>
+                      <th>Submitted By</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${documentsList}
+                  </tbody>
+                </table>
+              </div>
+              
+              <p>If you have any questions or need to submit additional documents, please contact the admission office immediately.</p>
+              
+              <p>Thank you!</p>
+            </div>
+            
+            <div class="footer">
+              <p>This is an automated email. Please do not reply to this message.</p>
+              <p>For assistance, contact the admission office.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    MailApp.sendEmail({
+      to: payload.email,
+      subject: `Document Receipt Acknowledgement - ${applicationNo}`,
+      htmlBody: htmlBody
+    });
+
+    logEmail(payload);
+    
+    return { success: true };
+
+  } catch (err) {
+    Logger.log("Error in sendAcknowledgementEmail: " + err.message);
+    return {
+      success: false,
+      error: err.message
+    };
+  }
+}
+
+/***********************
  * ISSUED DOCUMENTS - ENHANCED
  ***********************/
 
