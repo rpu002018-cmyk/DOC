@@ -1,0 +1,44 @@
+Students
+Register No,Application No,Name,Section,Sub-Section,Email
+R001,A001,John Doe,CSE,A,john@mail.com
+R002,A002,Jane Smith,CSE,B,jane@mail.com
+R003,A003,Alan Li,ECE,A,alan@mail.com
+R004,A004,Priya Patel,ECE,B,priya@mail.com
+R005,A005,Rajesh Kumar,ME,A,rajesh@mail.com
+
+
+Documents
+Application No,Student Name,Document Name,Original,Xerox,Status,Submitted Date,Submitted By,Received By,Last Updated,Operator ID
+A001,John Doe,SSLC Marks Card,TRUE,FALSE,Submitted,2026-05-20,Father,Ram Kumar,2026-05-20,OP001
+A001,John Doe,Transfer Certificate,TRUE,TRUE,Submitted,2026-05-20,Mother,Ram Kumar,2026-05-20,OP001
+A002,Jane Smith,SSLC Marks Card,FALSE,TRUE,Submitted,2026-05-21,Self,Priya Singh,2026-05-21,OP002
+A002,Jane Smith,Study Certificate,TRUE,FALSE,Submitted,2026-05-21,Father,Priya Singh,2026-05-21,OP002
+A003,Alan Li,SSLC Marks Card,TRUE,TRUE,Submitted,2026-05-19,Brother,Priya Singh,2026-05-19,OP002
+A003,Alan Li,Aadhar Card,TRUE,FALSE,Pending,,,,2026-05-19,OP002
+A004,Priya Patel,SSLC Marks Card,TRUE,TRUE,Submitted,2026-05-22,Mother,Amit Patel,2026-05-22,OP003
+A005,Rajesh Kumar,Transfer Certificate,FALSE,TRUE,Submitted,2026-05-20,Self,Ram Kumar,2026-05-20,OP001
+
+
+Operators
+Operator ID,Password,Operator Name
+OP001,pass123,Ram Kumar
+OP002,pass456,Priya Singh
+OP003,pass789,Amit Patel
+OP004,pass321,Vikram Sharma
+
+
+Email Log
+Timestamp,Application No,Student Name,Email,Operator Name
+2026-05-20 10:30:00,A001,John Doe,john@mail.com,Ram Kumar
+2026-05-21 11:15:00,A002,Jane Smith,jane@mail.com,Priya Singh
+2026-05-19 09:45:00,A003,Alan Li,alan@mail.com,Priya Singh
+2026-05-22 14:20:00,A004,Priya Patel,priya@mail.com,Amit Patel
+
+
+Issued Documents
+ID,Application No,Student Name,Document Name,Quantity,Issued Date,Issued By,Purpose/Received By,Notes/Remarks,Issued To,Created Date,Created By,Last Updated,Status
+uuid-001,A001,John Doe,Bonafide Certificate,2,2026-05-22,Ram Kumar,Higher Studies,Signed copy,John Doe,2026-05-22,ram@school.com,,Issued
+uuid-002,A002,Jane Smith,ID Card,1,2026-05-22,Priya Singh,Hostel Admission,Valid for 2 years,Jane Smith (Hostel),2026-05-22,priya@school.com,,Issued
+uuid-003,A001,John Doe,Migration Certificate,1,2026-05-23,Ram Kumar,Transfer to Other College,Attested,John Doe,2026-05-23,ram@school.com,,Issued
+uuid-004,A003,Alan Li,Fee Receipt,1,2026-05-20,Priya Singh,Fee Payment Proof,Original,Alan Li,2026-05-20,priya@school.com,,Issued
+uuid-005,A004,Priya Patel,Bonafide Certificate,3,2026-05-23,Amit Patel,Scholarship Application,Notarized,Priya Patel,2026-05-23,amit@school.com,,Issued
