@@ -1,1016 +1,771 @@
+/***************************************************************
+ * ADMISSION DOCUMENT ACKNOWLEDGEMENT SYSTEM
+ * Backend: Google Apps Script (code.gs)
+ *
+ * Sheets:
+ * 1. Students  : Register No, Application No, Name, Section,
+ *                Sub Section, Email
+ * 2. Documents : Application No, Student Name, Document Name,
+ *                Original, Xerox, Status, Submitted Date,
+ *                Submitted By, Received By, Last Updated, Updated By
+ * 3. Operators : Operator ID, Password, Operator Name, Role
+ * 4. Email Log : Timestamp, Application No, Student Name,
+ *                Email, Operator Name
+ *
+ * Added:
+ * - Admin/Operator roles
+ * - Server-verified admin-only pending report
+ * - Pending report data for PDF generation in index.html
+ * - Preservation of existing document receipt details
+ ***************************************************************/
+
 /***********************
  * CONFIGURATION
  ***********************/
-const SHEET_ID = "1uP4cJ8eke-UHTDV1qiJ_Fm0SlwmJRr6CkkuMqpKAyRU";
+const SHEET_ID = "1TFnZhXGQMszla0Xsaa6raof9zylLoEtuu1WIE_7X8uw";
 const DATE_FORMAT = "dd-MM-yyyy";
-const TZ = Session.getScriptTimeZone();
+const TZ = Session.getScriptTimeZone() || "Asia/Kolkata";
 
 const SHEETS = {
   STUDENTS: "Students",
   DOCUMENTS: "Documents",
   OPERATORS: "Operators",
-  EMAIL_LOG: "Email Log",
-  ISSUED_DOCUMENTS: "Issued Documents"
+  EMAIL_LOG: "Email Log"
 };
 
-const RECEIVED_DOCUMENTS = [
-  "SSLC Marks Card",
-  "Transfer Certificate",
-  "Study Certificate",
-  "Aadhar Card",
-  "Caste Certificate",
-  "Income Certificate",
-  "Passport Size Photos"
-];
-
-const ISSUED_DOCUMENTS_MASTER = [
-  "Bonafide Certificate",
-  "ID Card",
-  "Fee Receipt",
-  "Migration Certificate"
+const REQUIRED_DOCUMENTS = [
+  "10TH Hall Ticket Xerox",
+  "10TH marks sheet Original",
+  "10TH marks sheet Xerox",
+  "Transfer Certificate Original",
+  "Transfer Certificate Xerox",
+  "Migration Certificate Original",
+  "Migration Certificate Xerox",
+  "Student Photo",
+  "Caste Certificate Xerox",
+  "Aadhar Card Student Xerox",
+  "Aadhar Card Mother Xerox",
+  "Aadhar Card Father Xerox",
+  "Study Certificate Xerox"
 ];
 
 /***********************
- * COMMON
+ * COMMON HELPERS
  ***********************/
 function getSS() {
   return SpreadsheetApp.openById(SHEET_ID);
 }
 
-function toBool(v) {
-  if (v === true) return true;
-  if (v === false) return false;
-  if (v == null) return false;
+function getSheetOrThrow(sheetName) {
+  const sheet = getSS().getSheetByName(sheetName);
+  if (!sheet) {
+    throw new Error('Required sheet "' + sheetName + '" was not found.');
+  }
+  return sheet;
+}
 
-  const s = String(v).trim().toLowerCase();
+function toBool(value) {
+  if (value === true) return true;
+  if (value === false || value == null || value === "") return false;
 
-  return (
-    s === "true" ||
-    s === "yes" ||
-    s === "y" ||
-    s === "1"
-  );
+  const s = String(value).trim().toLowerCase();
+  return ["true", "yes", "y", "1", "received"].includes(s);
+}
+
+function cleanText(value) {
+  return String(value == null ? "" : value).trim();
+}
+
+function formatDate(value) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (isNaN(date.getTime())) return String(value);
+  return Utilities.formatDate(date, TZ, DATE_FORMAT);
+}
+
+function normalizeKey(value) {
+  return cleanText(value).toLowerCase();
+}
+
+function ensureHeader(sheet, headers) {
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(headers);
+    sheet.setFrozenRows(1);
+    return;
+  }
+
+  const current = sheet.getRange(1, 1, 1, headers.length)
+    .getDisplayValues()[0];
+
+  const isBlank = current.every(v => !cleanText(v));
+
+  if (isBlank) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.setFrozenRows(1);
+  }
 }
 
 /***********************
  * WEB APP ENTRY
  ***********************/
 function doGet() {
-  return HtmlService
-    .createHtmlOutputFromFile("index")
-    .setTitle(
-      "Admission Document Acknowledgement"
-    );
+  return HtmlService.createHtmlOutputFromFile("index")
+    .setTitle("Admission Document Acknowledgement")
+    .addMetaTag("viewport", "width=device-width, initial-scale=1");
 }
 
 /***********************
- * DOCUMENT MASTER
+ * OPERATOR LOGIN
+ *
+ * Operators sheet:
+ * A = Operator ID
+ * B = Password
+ * C = Operator Name
+ * D = Role (Admin / Operator)
  ***********************/
-function getReceivedDocumentsList() {
-  return RECEIVED_DOCUMENTS;
-}
-
-function getIssuedDocumentsList() {
-  return ISSUED_DOCUMENTS_MASTER;
-}
-
-/***********************
- * LOGIN
- ***********************/
-function validateOperator(id,pwd){
-
- const sh=
- getSS()
- .getSheetByName(
- SHEETS.OPERATORS
- );
-
- if(!sh)
- throw new Error(
- "Operators sheet missing"
- );
-
- const data=
- sh.getDataRange()
- .getValues();
-
- const uid=
- String(id||"").trim();
-
- const upwd=
- String(pwd||"").trim();
-
- for(
- let i=1;
- i<data.length;
- i++
- ){
-
- const rowId=
- String(
- data[i][0]||""
- ).trim();
-
- const rowPwd=
- String(
- data[i][1]||""
- ).trim();
-
- if(
- rowId===uid &&
- rowPwd===upwd
- ){
-
- return{
- success:true,
- name:data[i][2]
- };
-
- }
-
- }
-
- return{
- success:false
- };
-
-}
-
-/***********************
- * STUDENTS
- ***********************/
-function addStudent(student){
-
- const sh=
- getSS()
- .getSheetByName(
- SHEETS.STUDENTS
- );
-
- if(!sh)
- throw new Error(
- "Students sheet missing"
- );
-
- const data=
- sh.getDataRange()
- .getValues();
-
- for(
- let i=1;
- i<data.length;
- i++
- ){
-
- if(
- String(data[i][0])
- ===student.registerNo ||
-
- String(data[i][1])
- ===student.applicationNo
- ){
-
- return{
- success:false,
- error:
- "Duplicate student"
- };
-
- }
-
- }
-
- sh.appendRow([
-
- student.registerNo,
-
- student.applicationNo,
-
- student.name,
-
- student.section||"",
-
- student.subSection||"",
-
- student.email||""
-
- ]);
-
- return{
- success:true
- };
-
-}
-
-function searchStudent(value){
-
- const sh=
- getSS()
- .getSheetByName(
- SHEETS.STUDENTS
- );
-
- if(!sh)
- throw new Error(
- "Students sheet missing"
- );
-
- const data=
- sh.getDataRange()
- .getValues();
-
- const v=
- String(
- value||""
- ).trim();
-
- for(
- let i=1;
- i<data.length;
- i++
- ){
-
- if(
-
- String(
- data[i][0]
- ).trim()===v ||
-
- String(
- data[i][1]
- ).trim()===v
-
- ){
-
- return{
-
- registerNo:
- data[i][0],
-
- applicationNo:
- data[i][1],
-
- name:
- data[i][2],
-
- section:
- data[i][3],
-
- subSection:
- data[i][4],
-
- email:
- data[i][5]||""
-
- };
-
- }
-
- }
-
- return null;
-
-}
-
-/***********************
- * EXISTING DOCUMENTS
- ***********************/
-function loadExistingDocuments(
- applicationNo
-){
-
- const sh=
- getSS()
- .getSheetByName(
- SHEETS.DOCUMENTS
- );
-
- if(!sh)
- return [];
-
- const data=
- sh.getDataRange()
- .getValues();
-
- return data
- .filter((r,i)=>
-
- i>0 &&
-
- String(r[0])
- ===String(
- applicationNo
- )
-
- )
-
- .map(r=>({
-
- name:r[2],
-
- original:
- toBool(r[3]),
-
- xerox:
- toBool(r[4]),
-
- status:
- r[5] ||
-
- (
- toBool(r[3])
- ||
- toBool(r[4])
- ?
- "Submitted"
- :
- "Pending"
- ),
-
- submittedDate:
-
- r[6]
- ?
- Utilities
- .formatDate(
- new Date(r[6]),
- TZ,
- DATE_FORMAT
- )
- :"",
-
- submittedBy:
- r[7]||"",
-
- receivedBy:
- r[8]||""
-
- }));
-
-}
-
-/***********************
- * SAVE RECEIVED DOCS
- ***********************/
-function saveDocuments(payload){
-
- const lock=
- LockService
- .getScriptLock();
-
- lock.waitLock(
- 30000
- );
-
- try{
-
- const sh=
- getSS()
- .getSheetByName(
- SHEETS.DOCUMENTS
- );
-
- const data=
- sh.getDataRange()
- .getValues();
-
- const now=
- new Date();
-
- payload.documents
- .forEach(doc=>{
-
- let rowIndex=-1;
- let existing=null;
-
- for(
- let i=1;
- i<data.length;
- i++
- ){
-
- if(
-
- String(
- data[i][0]
- ).trim()
- ===
- String(
- payload.applicationNo
- ).trim()
-
- &&
-
- String(
- data[i][2]
- ).trim()
- ===
- String(
- doc.name
- ).trim()
-
- ){
-
- rowIndex=i+1;
-
- existing=data[i];
-
- break;
-
- }
-
- }
-
- const existingOriginal=
- existing
- ?toBool(
- existing[3]
- )
- :false;
-
- const existingXerox=
- existing
- ?toBool(
- existing[4]
- )
- :false;
-
- const finalOriginal=
- existingOriginal
- ||
- doc.original;
-
- const finalXerox=
- existingXerox
- ||
- doc.xerox;
-
- const row=[
-
- payload.applicationNo,
-
- payload.studentName,
-
- doc.name,
-
- finalOriginal,
-
- finalXerox,
-
- (
- finalOriginal||
- finalXerox
- )
- ?
- "Submitted"
- :
- "Pending",
-
- now,
-
- doc.submittedBy||"",
-
- payload.operatorName,
-
- now,
-
- payload.operatorId
-
- ];
-
- if(
- rowIndex>0
- ){
-
- sh
- .getRange(
- rowIndex,
- 1,
- 1,
- row.length
- )
- .setValues([row]);
-
- }
-
- else{
-
- sh.appendRow(
- row
- );
-
- }
-
- });
-
- if(
- payload.email
- ){
-
- sendAcknowledgementEmail(
- payload
- );
-
- }
-
- return{
- success:true
- };
-
- }
-
- catch(err){
-
- return{
-
- success:false,
-
- error:
- err.message
-
- };
-
- }
-
- finally{
-
- lock.releaseLock();
-
- }
-
-}
-
-/***********************
- * RECEIVED DOCUMENTS EMAIL
- ***********************/
-function sendAcknowledgementEmail(payload) {
-  if (!payload.email || String(payload.email).trim() === "") {
-    return { success: true };
-  }
-
+function validateOperator(id, pwd) {
   try {
-    const studentName = payload.studentName || "Student";
-    const applicationNo = payload.applicationNo || "N/A";
-    const submissionDate = Utilities.formatDate(new Date(), TZ, DATE_FORMAT);
-    
-    let documentsList = "";
+    const sh = getSheetOrThrow(SHEETS.OPERATORS);
+    const data = sh.getDataRange().getDisplayValues();
 
-    payload.documents.forEach(d => {
-      const docTypes = [];
-      if (d.original) docTypes.push("Original");
-      if (d.xerox) docTypes.push("Xerox");
-      documentsList += `
-        <tr>
-          <td style="padding: 8px; border-bottom: 1px solid #ddd;">${d.name}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #ddd;">${docTypes.join(", ") || "-"}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #ddd;">${d.submittedBy || "-"}</td>
-        </tr>
-      `;
-    });
+    const userId = cleanText(id);
+    const userPassword = cleanText(pwd);
 
-    const htmlBody = `
-      <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background-color: #2196F3; color: white; padding: 15px; border-radius: 5px; }
-            .content { padding: 20px 0; }
-            .table-container { margin: 20px 0; }
-            table { width: 100%; border-collapse: collapse; }
-            th { background-color: #f2f2f2; padding: 10px; text-align: left; border-bottom: 2px solid #ddd; }
-            .footer { color: #666; font-size: 12px; margin-top: 20px; border-top: 1px solid #ddd; padding-top: 10px; }
-            .info-box { background-color: #f9f9f9; padding: 10px; border-left: 4px solid #2196F3; margin: 10px 0; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h2>Document Receipt Acknowledgement</h2>
-            </div>
-            
-            <div class="content">
-              <p>Dear <strong>${studentName}</strong>,</p>
-              
-              <p>This is to acknowledge receipt of the following documents submitted for your admission.</p>
-              
-              <div class="info-box">
-                <p><strong>Application No:</strong> ${applicationNo}</p>
-                <p><strong>Submission Date:</strong> ${submissionDate}</p>
-                <p><strong>Received By:</strong> ${payload.operatorName || "-"}</p>
-              </div>
-              
-              <div class="table-container">
-                <h3>Submitted Documents:</h3>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Document Name</th>
-                      <th>Type</th>
-                      <th>Submitted By</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${documentsList}
-                  </tbody>
-                </table>
-              </div>
-              
-              <p>If you have any questions or need to submit additional documents, please contact the admission office immediately.</p>
-              
-              <p>Thank you!</p>
-            </div>
-            
-            <div class="footer">
-              <p>This is an automated email. Please do not reply to this message.</p>
-              <p>For assistance, contact the admission office.</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `;
+    if (!userId || !userPassword) {
+      return {
+        success: false,
+        message: "Enter Operator ID and password."
+      };
+    }
 
-    MailApp.sendEmail({
-      to: payload.email,
-      subject: `Document Receipt Acknowledgement - ${applicationNo}`,
-      htmlBody: htmlBody
-    });
+    for (let i = 1; i < data.length; i++) {
+      const rowId = cleanText(data[i][0]);
+      const rowPassword = cleanText(data[i][1]);
 
-    logEmail(payload);
-    
-    return { success: true };
+      if (rowId === userId && rowPassword === userPassword) {
+        const name = cleanText(data[i][2]) || userId;
 
-  } catch (err) {
-    Logger.log("Error in sendAcknowledgementEmail: " + err.message);
+        // Existing rows without a role default to Operator.
+        // Admin access must be explicitly assigned in column D.
+        const role = cleanText(data[i][3]) || "Operator";
+
+        return {
+          success: true,
+          name: name,
+          operatorId: userId,
+          role: role
+        };
+      }
+    }
+
     return {
       success: false,
-      error: err.message
+      message: "Invalid Operator ID or password."
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error.message || "Login validation failed."
     };
   }
 }
 
 /***********************
- * ISSUED DOCUMENTS - ENHANCED
+ * STUDENT REGISTRATION
+ *
+ * student:
+ * {
+ *   registerNo, applicationNo, name,
+ *   section, subSection, email
+ * }
  ***********************/
+function addStudent(student) {
+  try {
+    const sh = getSheetOrThrow(SHEETS.STUDENTS);
 
-/**
- * Validates issued document payload
- * @param {Object} payload - Document payload
- * @returns {Object} - {valid: boolean, error: string}
- */
-function validateIssuedDocumentsPayload(payload) {
-  if (!payload.applicationNo || String(payload.applicationNo).trim() === "") {
-    return { valid: false, error: "Application number is required" };
-  }
-  
-  if (!payload.studentName || String(payload.studentName).trim() === "") {
-    return { valid: false, error: "Student name is required" };
-  }
-  
-  if (!Array.isArray(payload.documents) || payload.documents.length === 0) {
-    return { valid: false, error: "At least one document must be selected" };
-  }
-  
-  // Validate each document
-  for (let doc of payload.documents) {
-    if (!doc.name || String(doc.name).trim() === "") {
-      return { valid: false, error: "Document name cannot be empty" };
+    if (
+      !student ||
+      !cleanText(student.registerNo) ||
+      !cleanText(student.applicationNo) ||
+      !cleanText(student.name)
+    ) {
+      return {
+        success: false,
+        error: "Register No, Application No and Name are required."
+      };
     }
-    
-    if (!doc.quantity || doc.quantity < 1) {
-      return { valid: false, error: `Invalid quantity for ${doc.name}` };
-    }
-    
-    if (!doc.receivedBy || String(doc.receivedBy).trim() === "") {
-      return { valid: false, error: `Received by information required for ${doc.name}` };
-    }
-  }
-  
-  if (!payload.operatorName || String(payload.operatorName).trim() === "") {
-    return { valid: false, error: "Operator name is required" };
-  }
-  
-  if (!payload.operatorId || String(payload.operatorId).trim() === "") {
-    return { valid: false, error: "Operator ID is required" };
-  }
-  
-  return { valid: true };
-}
 
-/**
- * Enhanced saveIssuedDocuments with validation and error handling
- * @param {Object} payload - Contains applicationNo, studentName, documents, operatorName, operatorId, email
- * @returns {Object} - {success: boolean, error?: string, documentCount?: number}
- */
-function saveIssuedDocuments(payload) {
-  // Validate payload
-  const validation = validateIssuedDocumentsPayload(payload);
-  if (!validation.valid) {
+    const registerNo = cleanText(student.registerNo);
+    const applicationNo = cleanText(student.applicationNo);
+    const name = cleanText(student.name);
+
+    const data = sh.getDataRange().getDisplayValues();
+
+    for (let i = 1; i < data.length; i++) {
+      const existingRegisterNo = cleanText(data[i][0]);
+      const existingApplicationNo = cleanText(data[i][1]);
+
+      if (
+        normalizeKey(existingRegisterNo) === normalizeKey(registerNo) ||
+        normalizeKey(existingApplicationNo) === normalizeKey(applicationNo)
+      ) {
+        return {
+          success: false,
+          error: "A student with the same Register No or Application No already exists."
+        };
+      }
+    }
+
+    sh.appendRow([
+      registerNo,
+      applicationNo,
+      name,
+      cleanText(student.section),
+      cleanText(student.subSection),
+      cleanText(student.email)
+    ]);
+
+    return { success: true };
+  } catch (error) {
     return {
       success: false,
-      error: validation.error
+      error: error.message || "Unable to register student."
     };
   }
+}
+
+/***********************
+ * STUDENT SEARCH
+ * Search by Register No or Application No.
+ ***********************/
+function searchStudent(value) {
+  try {
+    const sh = getSheetOrThrow(SHEETS.STUDENTS);
+    const data = sh.getDataRange().getDisplayValues();
+    const searchValue = cleanText(value);
+
+    if (!searchValue) return null;
+
+    for (let i = 1; i < data.length; i++) {
+      const registerNo = cleanText(data[i][0]);
+      const applicationNo = cleanText(data[i][1]);
+
+      if (
+        normalizeKey(registerNo) === normalizeKey(searchValue) ||
+        normalizeKey(applicationNo) === normalizeKey(searchValue)
+      ) {
+        return {
+          registerNo: data[i][0],
+          applicationNo: data[i][1],
+          name: data[i][2],
+          section: data[i][3],
+          subSection: data[i][4],
+          email: data[i][5]
+        };
+      }
+    }
+
+    return null;
+  } catch (error) {
+    throw new Error(error.message || "Student search failed.");
+  }
+}
+
+/***********************
+ * LOAD EXISTING DOCUMENTS
+ ***********************/
+function loadExistingDocuments(applicationNo) {
+  const sh = getSheetOrThrow(SHEETS.DOCUMENTS);
+  const data = sh.getDataRange().getValues();
+  const appNo = cleanText(applicationNo);
+
+  return data
+    .filter((row, index) =>
+      index > 0 &&
+      cleanText(row[0]) === appNo
+    )
+    .map(row => ({
+      name: row[2],
+      original: toBool(row[3]),
+      xerox: toBool(row[4]),
+      status: row[5] ||
+        ((toBool(row[3]) || toBool(row[4])) ? "Submitted" : "Pending"),
+      submittedDate: formatDate(row[6]),
+      submittedBy: row[7] || "",
+      receivedBy: row[8] || ""
+    }));
+}
+
+/***********************
+ * SAVE DOCUMENTS
+ *
+ * Existing submitted flags cannot be removed.
+ * Existing submitted date/by/received by are preserved.
+ * Received By is assigned only if it was previously blank.
+ ***********************/
+function saveDocuments(payload) {
+  const lock = LockService.getScriptLock();
 
   try {
-    let documentCount = 0;
+    if (!payload || !cleanText(payload.applicationNo)) {
+      return {
+        success: false,
+        error: "Application No is required."
+      };
+    }
 
-    payload.documents.forEach(doc => {
-      const result = addIssuedDocument({
-        applicationNo: payload.applicationNo,
-        studentName: payload.studentName,
-        documentName: doc.name,
-        quantity: doc.quantity,
-        issuedDate: new Date(),
-        issuedBy: payload.operatorName,
-        purpose: doc.receivedBy,
-        notes: doc.remarks || "",
-        issuedTo: doc.issuedTo || ""
-      });
-      
-      if (result.success) {
-        documentCount++;
+    if (!Array.isArray(payload.documents)) {
+      return {
+        success: false,
+        error: "Document list is missing."
+      };
+    }
+
+    lock.waitLock(20000);
+
+    const sh = getSheetOrThrow(SHEETS.DOCUMENTS);
+    const now = new Date();
+
+    payload.documents.forEach(function(doc) {
+      if (!doc || !cleanText(doc.name)) return;
+
+      const appNo = cleanText(payload.applicationNo);
+      const docName = cleanText(doc.name);
+
+      // Re-read data so each document finds the latest row.
+      const data = sh.getDataRange().getValues();
+      let rowIndex = -1;
+      let existing = null;
+
+      for (let i = 1; i < data.length; i++) {
+        if (
+          cleanText(data[i][0]) === appNo &&
+          cleanText(data[i][2]) === docName
+        ) {
+          rowIndex = i + 1;
+          existing = data[i];
+          break;
+        }
+      }
+
+      const existingOriginal = existing ? toBool(existing[3]) : false;
+      const existingXerox = existing ? toBool(existing[4]) : false;
+
+      const wantsOriginal = toBool(doc.original);
+      const wantsXerox = toBool(doc.xerox);
+
+      const newOriginalSubmitted = wantsOriginal && !existingOriginal;
+      const newXeroxSubmitted = wantsXerox && !existingXerox;
+      const isNewSubmission = newOriginalSubmitted || newXeroxSubmitted;
+
+      const finalOriginal = existingOriginal || wantsOriginal;
+      const finalXerox = existingXerox || wantsXerox;
+
+      // Keep already received information unchanged if no new flag was added.
+      if (existing && !isNewSubmission) {
+        return;
+      }
+
+      let submittedDate = existing ? existing[6] : "";
+      let submittedBy = existing ? existing[7] : "";
+      let receivedBy = existing ? existing[8] : "";
+
+      if (isNewSubmission) {
+        submittedDate = now;
+        submittedBy = cleanText(doc.submittedBy) || submittedBy || "";
+
+        if (!cleanText(receivedBy)) {
+          receivedBy = cleanText(payload.operatorName);
+        }
+      }
+
+      const status = (finalOriginal || finalXerox)
+        ? "Submitted"
+        : "Pending";
+
+      const row = [
+        appNo,                                  // A Application No
+        cleanText(payload.studentName),         // B Student Name
+        docName,                                // C Document Name
+        finalOriginal,                          // D Original
+        finalXerox,                             // E Xerox
+        status,                                 // F Status
+        submittedDate,                          // G Submitted Date
+        submittedBy,                            // H Submitted By
+        receivedBy,                             // I Received By
+        now,                                    // J Last Updated
+        cleanText(payload.operatorId)           // K Updated By
+      ];
+
+      if (rowIndex > 0) {
+        sh.getRange(rowIndex, 1, 1, row.length).setValues([row]);
+      } else {
+        sh.appendRow(row);
       }
     });
 
     if (payload.email) {
-      const emailResult = sendIssuedEmail(payload);
-      if (!emailResult.success) {
-        Logger.log("Email sending failed: " + emailResult.error);
+      try {
+        sendAcknowledgementEmail(payload);
+      } catch (emailError) {
+        console.error("Acknowledgement email failed: " + emailError.message);
+        return {
+          success: true,
+          emailSent: false,
+          message: "Documents saved, but the acknowledgement email could not be sent."
+        };
       }
     }
 
-    return {
-      success: true,
-      documentCount: documentCount
-    };
-
-  } catch (err) {
-    Logger.log("Error in saveIssuedDocuments: " + err.message);
+    return { success: true };
+  } catch (error) {
     return {
       success: false,
-      error: err.message
-    };
-  }
-}
-
-/**
- * Enhanced addIssuedDocument with new fields and validation
- * @param {Object} issuedDoc - Document details with new fields
- * @returns {Object} - {success: boolean, id?: string, error?: string}
- */
-function addIssuedDocument(issuedDoc) {
-  const lock = LockService.getScriptLock();
-
-  lock.waitLock(30000);
-
-  try {
-    const sh = getSS().getSheetByName(SHEETS.ISSUED_DOCUMENTS);
-
-    if (!sh) {
-      throw new Error("Issued Documents sheet missing");
-    }
-
-    // Validation
-    if (!issuedDoc.applicationNo || !issuedDoc.documentName) {
-      throw new Error("Application number and document name are required");
-    }
-
-    const id = Utilities.getUuid();
-    const now = new Date();
-    const operatorEmail = Session.getEffectiveUser().getEmail();
-
-    // Enhanced row with new fields
-    const row = [
-      id,                                    // Column 0: ID
-      issuedDoc.applicationNo,               // Column 1: Application No
-      issuedDoc.studentName,                 // Column 2: Student Name
-      issuedDoc.documentName,                // Column 3: Document Name
-      issuedDoc.quantity || 1,               // Column 4: Quantity
-      issuedDoc.issuedDate || now,           // Column 5: Issued Date
-      issuedDoc.issuedBy || "",              // Column 6: Issued By
-      issuedDoc.purpose || "",               // Column 7: Purpose/Received By
-      issuedDoc.notes || "",                 // Column 8: Notes/Remarks
-      issuedDoc.issuedTo || "",              // Column 9: Issued To (NEW)
-      now,                                   // Column 10: Created Date
-      operatorEmail,                         // Column 11: Created By
-      "",                                    // Column 12: Last Updated (for future use)
-      ""                                     // Column 13: Status (for future use)
-    ];
-
-    sh.appendRow(row);
-
-    return {
-      success: true,
-      id: id
-    };
-
-  } catch (err) {
-    Logger.log("Error in addIssuedDocument: " + err.message);
-    return {
-      success: false,
-      error: err.message
+      error: error.message || "Unable to save documents."
     };
   } finally {
-    lock.releaseLock();
+    if (lock.hasLock()) lock.releaseLock();
   }
 }
 
-/**
- * Enhanced loadIssuedDocuments with better filtering and formatting
- * @param {string} applicationNo - Application number
- * @returns {Array} - Array of issued documents
- */
-function loadIssuedDocuments(applicationNo) {
+/***********************
+ * ADMIN-ONLY DOCUMENT PENDING REPORT
+ *
+ * Called by index.html:
+ * getDocumentPendingReportForAdmin(operatorId, password)
+ *
+ * Report includes each student and each required document
+ * that has no received/submitted Original or Xerox flag.
+ *
+ * A4 PDF is generated in index.html using this returned data.
+ * No sheet data is modified by this function.
+ ***********************/
+function getDocumentPendingReportForAdmin(operatorId, password) {
   try {
-    const sh = getSS().getSheetByName(SHEETS.ISSUED_DOCUMENTS);
+    const userId = cleanText(operatorId);
+    const userPassword = cleanText(password);
 
-    if (!sh) {
-      return [];
+    if (!userId || !userPassword) {
+      return {
+        success: false,
+        message: "Administrator login is required."
+      };
     }
 
-    const data = sh.getDataRange().getValues();
+    const operatorsSheet = getSheetOrThrow(SHEETS.OPERATORS);
+    const studentsSheet = getSheetOrThrow(SHEETS.STUDENTS);
+    const documentsSheet = getSheetOrThrow(SHEETS.DOCUMENTS);
 
-    return data
-      .filter((r, i) => i > 0 && String(r[1]).trim() === String(applicationNo).trim())
-      .map(r => ({
-        id: r[0],
-        applicationNo: r[1],
-        studentName: r[2],
-        documentName: r[3],
-        quantity: r[4],
-        issuedDate: r[5] 
-          ? Utilities.formatDate(new Date(r[5]), TZ, DATE_FORMAT)
-          : "",
-        issuedBy: r[6],
-        purpose: r[7],
-        notes: r[8],
-        issuedTo: r[9] || "",  // NEW field
-        createdDate: r[10]
-          ? Utilities.formatDate(new Date(r[10]), TZ, DATE_FORMAT)
-          : "",
-        createdBy: r[11]
-      }))
-      .sort((a, b) => new Date(b.issuedDate) - new Date(a.issuedDate)); // Sort by date, newest first
-      
-  } catch (err) {
-    Logger.log("Error in loadIssuedDocuments: " + err.message);
-    return [];
-  }
-}
+    // Verify administrator credentials directly against the sheet.
+    // Never rely only on a role value supplied by the browser.
+    const operatorData = operatorsSheet.getDataRange().getDisplayValues();
+    let adminFound = false;
 
-/**
- * Get count of issued documents for a student
- * @param {string} applicationNo - Application number
- * @returns {number} - Total quantity of documents issued
- */
-function getIssuedDocumentsCount(applicationNo) {
-  const documents = loadIssuedDocuments(applicationNo);
-  return documents.reduce((total, doc) => total + (doc.quantity || 0), 0);
-}
+    for (let i = 1; i < operatorData.length; i++) {
+      const rowId = cleanText(operatorData[i][0]);
+      const rowPassword = cleanText(operatorData[i][1]);
+      const rowRole = cleanText(operatorData[i][3]).toLowerCase();
 
-/**
- * Enhanced email sending with better formatting and HTML template
- * @param {Object} payload - Document payload with email info
- * @returns {Object} - {success: boolean, error?: string}
- */
-function sendIssuedEmail(payload) {
-  if (!payload.email || String(payload.email).trim() === "") {
-    return { success: true }; // Email not required
-  }
+      if (
+        rowId === userId &&
+        rowPassword === userPassword &&
+        rowRole === "admin"
+      ) {
+        adminFound = true;
+        break;
+      }
+    }
 
-  try {
-    const studentName = payload.studentName || "Student";
-    const applicationNo = payload.applicationNo || "N/A";
-    const issuedDate = Utilities.formatDate(new Date(), TZ, DATE_FORMAT);
-    
-    let documentsList = "";
-    let totalQuantity = 0;
+    if (!adminFound) {
+      return {
+        success: false,
+        message: "Access denied. Only an administrator can generate this report."
+      };
+    }
 
-    payload.documents.forEach(d => {
-      const qty = d.quantity || 1;
-      totalQuantity += qty;
-      documentsList += `
-        <tr>
-          <td style="padding: 8px; border-bottom: 1px solid #ddd;">${d.name}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">${qty}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #ddd;">${d.receivedBy || "-"}</td>
-        </tr>
-      `;
-    });
+    const studentData = studentsSheet.getDataRange().getDisplayValues();
+    const documentData = documentsSheet.getDataRange().getValues();
 
-    const htmlBody = `
-      <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background-color: #4CAF50; color: white; padding: 15px; border-radius: 5px; }
-            .content { padding: 20px 0; }
-            .table-container { margin: 20px 0; }
-            table { width: 100%; border-collapse: collapse; }
-            th { background-color: #f2f2f2; padding: 10px; text-align: left; border-bottom: 2px solid #ddd; }
-            .footer { color: #666; font-size: 12px; margin-top: 20px; border-top: 1px solid #ddd; padding-top: 10px; }
-            .info-box { background-color: #f9f9f9; padding: 10px; border-left: 4px solid #4CAF50; margin: 10px 0; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h2>Document Issued Acknowledgement</h2>
-            </div>
-            
-            <div class="content">
-              <p>Dear <strong>${studentName}</strong>,</p>
-              
-              <p>This is to confirm that the following documents have been issued to you.</p>
-              
-              <div class="info-box">
-                <p><strong>Application No:</strong> ${applicationNo}</p>
-                <p><strong>Issued Date:</strong> ${issuedDate}</p>
-                <p><strong>Issued By:</strong> ${payload.operatorName || "-"}</p>
-              </div>
-              
-              <div class="table-container">
-                <h3>Issued Documents Details:</h3>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Document Name</th>
-                      <th style="text-align: center;">Quantity</th>
-                      <th>Purpose/Received By</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${documentsList}
-                    <tr style="background-color: #f2f2f2; font-weight: bold;">
-                      <td colspan="1" style="padding: 8px;">Total</td>
-                      <td style="padding: 8px; text-align: center;">${totalQuantity}</td>
-                      <td style="padding: 8px;"></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              
-              <p>If you have any questions or discrepancies, please contact the admission office immediately.</p>
-              
-              <p>Thank you!</p>
-            </div>
-            
-            <div class="footer">
-              <p>This is an automated email. Please do not reply to this message.</p>
-              <p>For assistance, contact the admission office.</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `;
+    // Map only documents that have at least one received flag.
+    const receivedMap = {};
 
-    MailApp.sendEmail({
-      to: payload.email,
-      subject: `Document Issued Acknowledgement - ${applicationNo}`,
-      htmlBody: htmlBody
-    });
+    for (let i = 1; i < documentData.length; i++) {
+      const row = documentData[i];
+      const appNo = cleanText(row[0]);
+      const docName = normalizeKey(row[2]);
 
-    logEmail(payload);
-    
-    return { success: true };
+      if (!appNo || !docName) continue;
 
-  } catch (err) {
-    Logger.log("Error in sendIssuedEmail: " + err.message);
+      const received =
+        toBool(row[3]) ||
+        toBool(row[4]);
+
+      if (received) {
+        receivedMap[appNo + "||" + docName] = true;
+      }
+    }
+
+    const pendingRows = [];
+    const studentsSeen = {};
+    let validStudentCount = 0;
+
+    for (let i = 1; i < studentData.length; i++) {
+      const row = studentData[i];
+
+      const registerNo = cleanText(row[0]);
+      const applicationNo = cleanText(row[1]);
+      const studentName = cleanText(row[2]);
+      const section = cleanText(row[3]);
+      const subSection = cleanText(row[4]);
+      const email = cleanText(row[5]);
+
+      if (!registerNo && !applicationNo && !studentName) continue;
+
+      validStudentCount++;
+
+      const studentKey = applicationNo ||
+        registerNo ||
+        ("ROW-" + (i + 1));
+
+      if (studentsSeen[studentKey]) continue;
+      studentsSeen[studentKey] = true;
+
+      REQUIRED_DOCUMENTS.forEach(function(documentName) {
+        const key = applicationNo + "||" + normalizeKey(documentName);
+
+        if (!receivedMap[key]) {
+          pendingRows.push({
+            registerNo: registerNo,
+            applicationNo: applicationNo,
+            studentName: studentName,
+            section: section,
+            subSection: subSection,
+            email: email,
+            documentName: documentName
+          });
+        }
+      });
+    }
+
+    return {
+      success: true,
+      generatedAt: Utilities.formatDate(
+        new Date(),
+        TZ,
+        "dd-MM-yyyy HH:mm"
+      ),
+      totalStudents: validStudentCount,
+      totalPending: pendingRows.length,
+      rows: pendingRows
+    };
+  } catch (error) {
     return {
       success: false,
-      error: err.message
+      message: error.message || "Unable to generate pending report."
     };
   }
+}
+
+/***********************
+ * EMAIL ACKNOWLEDGEMENT
+ ***********************/
+function sendAcknowledgementEmail(payload) {
+  if (!payload || !cleanText(payload.email)) return;
+
+  const subject =
+    "Admission Document Acknowledgement - " +
+    cleanText(payload.applicationNo);
+
+  const escapeHtml = function(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  };
+
+  let table = `
+    <table border="1" cellpadding="6" cellspacing="0"
+      style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:12px;">
+      <tr style="background:#e8eef8;">
+        <th>SL.NO</th>
+        <th>Document</th>
+        <th>Original</th>
+        <th>Xerox</th>
+        <th>Submitted By</th>
+        <th>Date</th>
+        <th>Received By</th>
+      </tr>`;
+
+  let sl = 1;
+  const docs = Array.isArray(payload.documents) ? payload.documents : [];
+
+  docs.forEach(function(doc) {
+    if (toBool(doc.original) || toBool(doc.xerox)) {
+      const dateText = doc.submittedDate ||
+        formatDate(new Date());
+
+      table += `
+        <tr>
+          <td>${sl++}</td>
+          <td>${escapeHtml(doc.name)}</td>
+          <td style="text-align:center">${toBool(doc.original) ? "Yes" : ""}</td>
+          <td style="text-align:center">${toBool(doc.xerox) ? "Yes" : ""}</td>
+          <td>${escapeHtml(doc.submittedBy || "")}</td>
+          <td>${escapeHtml(dateText)}</td>
+          <td>${escapeHtml(payload.operatorName || "")}</td>
+        </tr>`;
+    }
+  });
+
+  table += "</table>";
+
+  const body = `
+    <div style="font-family:Arial,sans-serif;color:#26344d;line-height:1.6;">
+      <p>Dear Student / Parent,</p>
+
+      <p>
+        This is to acknowledge the receipt of the documents submitted by the student.
+        This acknowledgement is issued for college record purposes.
+      </p>
+
+      <p><strong>Student Details</strong></p>
+      <p>
+        Name: ${escapeHtml(payload.studentName)}<br>
+        Application No: ${escapeHtml(payload.applicationNo)}<br>
+        Section: ${escapeHtml(payload.section || "-")}<br>
+        Sub-Section: ${escapeHtml(payload.subSection || "-")}
+      </p>
+
+      ${table}
+
+      <p>Yours faithfully,<br>
+      Office<br>
+      <strong>REVA Independent PU College</strong><br>
+      Rukmini Knowledge Park,<br>
+      Kattigenahalli, Yelahanka,<br>
+      Bangalore – 560064.<br><br>
+      Phone: 080-46966966 (Ext: 184)<br>
+      Email: <a href="mailto:ripu.k@reva.edu.in">ripu.k@reva.edu.in</a>
+      </p>
+    </div>`;
+
+  MailApp.sendEmail({
+    to: cleanText(payload.email),
+    subject: subject,
+    htmlBody: body
+  });
+
+  logEmail(payload);
 }
 
 /***********************
  * EMAIL LOG
  ***********************/
-function logEmail(payload){
+function logEmail(payload) {
+  const ss = getSS();
+  let sh = ss.getSheetByName(SHEETS.EMAIL_LOG);
 
- const sh=
- getSS()
- .getSheetByName(
- SHEETS.EMAIL_LOG
- );
+  if (!sh) {
+    sh = ss.insertSheet(SHEETS.EMAIL_LOG);
+    sh.appendRow([
+      "Timestamp",
+      "Application No",
+      "Student Name",
+      "Email",
+      "Operator Name"
+    ]);
+  }
 
- if(!sh)
- return;
+  sh.appendRow([
+    new Date(),
+    cleanText(payload.applicationNo),
+    cleanText(payload.studentName),
+    cleanText(payload.email),
+    cleanText(payload.operatorName)
+  ]);
+}
 
- sh.appendRow([
+/***********************
+ * ADMIN-ONLY PENDING DOCUMENT EMAIL REMINDER
+ ***********************/
+function sendPendingDocumentReminderForAdmin(operatorId, password, applicationNo) {
+  try {
+    const userId = cleanText(operatorId);
+    const userPassword = cleanText(password);
+    const appNo = cleanText(applicationNo);
+    if (!userId || !userPassword || !appNo) {
+      return { success: false, message: "Admin login and Application No are required." };
+    }
 
- new Date(),
+    const operatorData = getSheetOrThrow(SHEETS.OPERATORS).getDataRange().getDisplayValues();
+    const isAdmin = operatorData.slice(1).some(function(row) {
+      return cleanText(row[0]) === userId &&
+        cleanText(row[1]) === userPassword &&
+        cleanText(row[3]).toLowerCase() === "admin";
+    });
+    if (!isAdmin) return { success: false, message: "Access denied. Admin only." };
 
- payload.applicationNo,
+    const studentData = getSheetOrThrow(SHEETS.STUDENTS).getDataRange().getDisplayValues();
+    let student = null;
+    for (let i = 1; i < studentData.length; i++) {
+      if (cleanText(studentData[i][1]) === appNo) {
+        student = {
+          registerNo: cleanText(studentData[i][0]),
+          applicationNo: cleanText(studentData[i][1]),
+          name: cleanText(studentData[i][2]),
+          section: cleanText(studentData[i][3]),
+          subSection: cleanText(studentData[i][4]),
+          email: cleanText(studentData[i][5])
+        };
+        break;
+      }
+    }
+    if (!student) return { success: false, message: "Student record not found." };
+    if (!student.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(student.email)) {
+      return { success: false, message: "No valid email address is recorded for this student." };
+    }
 
- payload.studentName,
+    const docData = getSheetOrThrow(SHEETS.DOCUMENTS).getDataRange().getValues();
+    const receivedMap = {};
+    for (let i = 1; i < docData.length; i++) {
+      if (cleanText(docData[i][0]) === appNo &&
+          (toBool(docData[i][3]) || toBool(docData[i][4]))) {
+        receivedMap[normalizeKey(docData[i][2])] = true;
+      }
+    }
+    const pending = REQUIRED_DOCUMENTS.filter(function(name) {
+      return !receivedMap[normalizeKey(name)];
+    });
+    if (!pending.length) return { success: false, message: "This student has no pending documents." };
 
- payload.email,
+    const esc = function(v) {
+      return String(v == null ? "" : v).replace(/&/g,"&amp;").replace(/</g,"&lt;")
+        .replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+    };
+    const subject = "Reminder: Pending Admission Documents - " + student.applicationNo;
+    const list = pending.map(function(name, i) {
+      return "<li>" + esc(name) + "</li>";
+    }).join("");
+    const html = '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#24344d">' +
+      '<p>Dear ' + esc(student.name || "Student / Parent") + ',</p>' +
+      '<p>This is a reminder that the following admission documents are still pending. Kindly submit them to the college office.</p>' +
+      '<p><b>Register No:</b> ' + esc(student.registerNo) + '<br><b>Application No:</b> ' + esc(student.applicationNo) +
+      '<br><b>Section:</b> ' + esc([student.section,student.subSection].filter(Boolean).join(" / ") || "-") + '</p>' +
+      '<ol>' + list + '</ol><p>For assistance, please contact the college office.</p>' +
+      '<p>Yours faithfully,<br>Office<br><b>REVA Independent PU College</b><br>' +
+      'Phone: 080-46966966 (Ext: 184)<br>Email: ripu.k@reva.edu.in</p></div>';
 
- payload.operatorName
-
- ]);
-
+    MailApp.sendEmail({ to: student.email, subject: subject, htmlBody: html });
+    logEmail({
+      applicationNo: student.applicationNo,
+      studentName: student.name,
+      email: student.email,
+      operatorName: "Admin reminder: " + userId
+    });
+    return { success: true, message: "Reminder email sent to " + student.email, pendingCount: pending.length };
+  } catch (error) {
+    return { success: false, message: error.message || "Unable to send reminder email." };
+  }
 }
