@@ -6,9 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admission Document Acknowledgement</title>
   <meta name="theme-color" content="#173d80">
-
-  <!-- PDF libraries are loaded with fallback CDNs below. -->
-
   <style>
     :root {
       --navy:#163d7b;
@@ -104,14 +101,13 @@
     .btn:hover:not(:disabled) { transform:translateY(-2px); }
     .btn-primary { color:#fff; background:linear-gradient(120deg,#173f81,#397bea); box-shadow:0 7px 16px #c3d5f5; }
     .btn-soft { color:#24446f; background:#edf3fd; box-shadow:5px 5px 12px #d7e0ef,-4px -4px 10px #fff; }
-    .btn-green { color:#fff; background:linear-gradient(120deg,#087864,#12a58b); box-shadow:0 7px 16px #b9e4db; }
-    .btn-danger { color:#9f2525; background:#fff0ef; box-shadow:var(--inset); }
+    .tiny { font-size:11px; color:#71819a; }
     .alert { display:none; padding:12px 14px; margin:0 0 17px; border-radius:13px; font-size:12px; line-height:1.5; }
     .alert.show { display:block; }
     .alert.error { color:#9f2424; background:#fff0ef; border:1px solid #ffd9d5; }
     .alert.success { color:#126450; background:#e9f8f2; border:1px solid #c8eee1; }
     .student-summary {
-      display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; padding:16px;
+      display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; padding:16px;
       background:linear-gradient(130deg,#f5f8ff,#eaf1ff); border:1px solid #e0e9f8; border-radius:18px; margin-bottom:18px;
     }
     .summary-item span { display:block; color:#71819b; font-size:10px; text-transform:uppercase; letter-spacing:.7px; margin-bottom:5px; }
@@ -122,58 +118,26 @@
     td { padding:11px 10px; border-top:1px solid #e7edf6; color:#354967; vertical-align:middle; }
     tbody tr:nth-child(even) { background:#f8faff; }
     tbody tr:hover { background:#eef5ff; }
-    .doc-name { min-width:220px; font-weight:750; color:#203d68; }
-    .check-cell { text-align:center; width:90px; }
     .doc-check { width:18px; height:18px; min-height:18px; box-shadow:none; accent-color:#176b5a; cursor:pointer; }
     .doc-check:disabled { opacity:.85; cursor:not-allowed; }
     .status-pill { display:inline-flex; align-items:center; gap:5px; padding:5px 9px; border-radius:999px; font-size:10px; font-weight:800; white-space:nowrap; }
     .status-pending { color:#925c0b; background:#fff4d9; }
     .status-submitted { color:#086451; background:#def7ee; }
-    .tiny { font-size:11px; color:#71819a; }
-    .report-panel {
-      padding:22px; border-radius:22px; background:linear-gradient(145deg,#edf4ff,#fff);
-      border:1px solid #fff; box-shadow:var(--shadow); margin-bottom:22px;
-    }
-    .report-heading { display:flex; align-items:center; gap:13px; flex-wrap:wrap; }
-    .report-icon { width:48px; height:48px; border-radius:16px; display:grid; place-items:center; font-size:23px; background:linear-gradient(145deg,#dce9ff,#fff); box-shadow:5px 5px 12px #d1dbea,-4px -4px 10px #fff; }
-    .report-heading h3 { margin:0; font-size:18px; }
-    .report-heading p { margin:5px 0 0; font-size:12px; color:#687a96; }
-    .admin-badge { margin-left:auto; padding:7px 12px; border-radius:20px; color:#16458d; background:#dceaff; font-size:10px; font-weight:900; letter-spacing:1px; }
-    .report-stats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px; margin:20px 0; }
-    .stat { padding:15px; border-radius:16px; background:#f1f5fc; box-shadow:var(--inset); }
-    .stat span { display:block; font-size:11px; color:#6c7c96; }
-    .stat strong { display:block; margin-top:7px; font-size:25px; color:#173f81; }
-    .report-message { margin:13px 0 0; font-size:12px; color:#536782; line-height:1.5; }
-    .modal-backdrop { position:fixed; inset:0; z-index:20; display:grid; place-items:center; padding:18px; background:rgba(15,34,66,.5); backdrop-filter:blur(6px); }
+    .modal-backdrop { position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center; padding:18px; background:rgba(15,34,66,.5); backdrop-filter:blur(6px); }
     .modal { width:min(600px,100%); max-height:90vh; overflow:auto; background:#f4f7fd; border-radius:24px; padding:24px; box-shadow:0 25px 70px rgba(5,24,57,.28); }
     .modal-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:20px; }
     .modal-head h3 { margin:0; font-size:20px; }
-    .close-btn { width:36px; height:36px; border:0; border-radius:50%; background:#e7eef9; color:#29466e; font-size:20px; }
-    .footer { text-align:center; padding:12px; color:#7d8ba2; font-size:10px; }
-    .loader { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,.45); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; }
-    @keyframes spin { to { transform:rotate(360deg); } }
+    .close-btn { width:36px; height:36px; border:0; border-radius:50%; background:#e7eef9; color:#29466e; font-size:20px; cursor:pointer; }
     @media(max-width:760px) {
       .stepper { grid-template-columns:repeat(2,minmax(0,1fr)); }
-      .student-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .student-summary { grid-template-columns:repeat(1,minmax(0,1fr)); }
       .topbar { align-items:flex-start; }
       .user-area { width:100%; }
       .grid { grid-template-columns:1fr; }
-      .field.full { grid-column:auto; }
-    }
-    @media(max-width:460px) {
-      .page,.topbar { width:calc(100% - 20px); }
-      .topbar { margin-top:10px; padding:13px; }
-      .card { padding:16px; border-radius:19px; }
-      .step { padding:10px 8px; font-size:10px; }
-      .step .num { width:23px; height:23px; flex-basis:23px; }
-      .btn-row { justify-content:stretch; }
-      .btn-row .btn { flex:1 1 100%; }
-      .report-stats { gap:8px; }
-      .stat { padding:12px; }
     }
     @media print {
       body { background:#fff; }
-      .wave-wrap,.topbar,.welcome,.stepper,.no-print,.footer { display:none!important; }
+      .wave-wrap,.topbar,.welcome,.stepper,.no-print { display:none!important; }
     }
   </style>
 </head>
@@ -198,17 +162,17 @@
   <main class="page">
     <section class="welcome">
       <h2>Document Records Dashboard</h2>
-      <p>Manage student document acknowledgements, preserve received records, and send email confirmation. Administrator accounts also have access to the pending-document PDF report.</p>
+      <p>Manage student document acknowledgements and send email confirmation.</p>
     </section>
 
     <div id="globalAlert" class="alert" role="status" aria-live="polite"></div>
 
-    <!-- LOGIN -->
+    <!-- LOGIN PAGE -->
     <section id="loginPage" class="card">
       <div class="card-head">
         <div>
           <h2>Operator Login</h2>
-          <p>Sign in using the credentials registered in the Operators sheet.</p>
+          <p>Sign in using your registered credentials.</p>
         </div>
         <span class="status-pill status-submitted">SECURE ACCESS</span>
       </div>
@@ -226,11 +190,10 @@
         <div class="btn-row">
           <button id="loginBtn" class="btn btn-primary" type="submit">Sign in securely →</button>
         </div>
-        <p class="tiny">Admin access is assigned in the Operators sheet, column D (Role).</p>
       </form>
     </section>
 
-    <!-- APP -->
+    <!-- APP PAGE (hidden initially) -->
     <section id="appPage" class="hidden">
       <div class="stepper no-print">
         <div class="step active" id="stepNav1"><span class="num">1</span><span>Find Student</span></div>
@@ -238,46 +201,6 @@
         <div class="step" id="stepNav3"><span class="num">3</span><span>Confirm</span></div>
         <div class="step" id="stepNav4"><span class="num">4</span><span>Receipt</span></div>
       </div>
-
-      <!-- ADMIN-ONLY REPORT -->
-      <section id="adminPendingReport" class="report-panel hidden">
-        <div class="report-heading">
-          <div class="report-icon">📄</div>
-          <div>
-            <h3>Document Pending Report</h3>
-            <p>Administrator access · Section-wise report · PDF / Excel · Email reminders</p>
-          </div>
-          <span class="admin-badge">ADMIN ONLY</span>
-        </div>
-        <div class="report-stats">
-          <div class="stat"><span>Total registered students</span><strong id="pendingStudentCount">—</strong></div>
-          <div class="stat"><span>Pending document entries</span><strong id="pendingDocumentCount">—</strong></div>
-        </div>
-        <div class="btn-row" style="justify-content:flex-start">
-          <button type="button" id="generatePendingReportBtn" class="btn btn-primary" onclick="generateAdminPendingReport()">↻ Generate Report</button>
-          <button type="button" id="downloadPendingPdfBtn" class="btn btn-green" onclick="downloadPendingReportPDF()" disabled>↓ Download PDF</button>
-          <button type="button" id="downloadPendingExcelBtn" class="btn btn-soft" onclick="downloadPendingReportExcel()" disabled>↓ Download Excel</button>
-        </div>
-        <div class="grid" style="margin-top:18px">
-          <div class="field">
-            <label for="pendingSectionFilter">Filter by Section / Sub-section</label>
-            <select id="pendingSectionFilter" onchange="renderPendingReportTable()">
-              <option value="">All Sections</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="pendingStudentFilter">Find Student</label>
-            <input id="pendingStudentFilter" placeholder="Name / Register No. / Application No." oninput="renderPendingReportTable()">
-          </div>
-        </div>
-        <div class="table-wrap" style="margin-top:16px">
-          <table style="min-width:1050px">
-            <thead><tr><th>Sl. No.</th><th>Register No.</th><th>Application No.</th><th>Student Name</th><th>Section</th><th>Pending Documents</th><th>Email</th><th>Reminder</th></tr></thead>
-            <tbody id="pendingReportTableBody"><tr><td colspan="8">Generate the report to view pending students.</td></tr></tbody>
-          </table>
-        </div>
-        <p id="pendingReportMessage" class="report-message" role="status" aria-live="polite">Generate the report to check outstanding documents.</p>
-      </section>
 
       <!-- STEP 1: SEARCH / REGISTER -->
       <section id="step1Page" class="card">
@@ -296,7 +219,7 @@
           </div>
           <div class="btn-row">
             <button id="searchBtn" class="btn btn-primary" type="submit">⌕ Search Student</button>
-            <button class="btn btn-soft" type="button" onclick="openRegisterModal()">＋ Register New Student</button>
+            <button type="button" class="btn btn-soft" onclick="openRegisterModal()">＋ Register New Student</button>
           </div>
         </form>
         <div class="tiny" style="margin-top:14px">If the student is not found, register the student before recording documents.</div>
@@ -309,7 +232,6 @@
             <h2>Document Checklist</h2>
             <p>Received document flags are preserved. Previously received items are locked against unchecking.</p>
           </div>
-          <span class="status-pill status-pending" id="documentProgressPill">0 / 13 complete</span>
         </div>
 
         <div id="studentSummary" class="student-summary"></div>
@@ -323,9 +245,6 @@
               <option>Father</option>
               <option>Mother</option>
               <option>Guardian</option>
-              <option>Brother</option>
-              <option>Sister</option>
-              <option>Other Family Member</option>
             </select>
           </div>
           <div class="field">
@@ -340,18 +259,15 @@
               <tr>
                 <th>#</th>
                 <th>Document Name</th>
-                <th class="check-cell">Original</th>
-                <th class="check-cell">Xerox</th>
+                <th>Original</th>
+                <th>Xerox</th>
                 <th>Status</th>
-                <th>Submitted Date</th>
                 <th>Submitted By</th>
-                <th>Received By</th>
               </tr>
             </thead>
             <tbody id="documentsTableBody"></tbody>
           </table>
         </div>
-        <p class="tiny" style="margin-top:10px">Check only the document items physically received. Existing submitted records are read-only.</p>
         <div class="btn-row">
           <button type="button" class="btn btn-soft" onclick="backToSearch()">← Back</button>
           <button type="button" id="reviewBtn" class="btn btn-primary" onclick="reviewDocuments()">Review & Confirm →</button>
@@ -365,18 +281,17 @@
             <h2>Confirm Document Receipt</h2>
             <p>Review the items being recorded before saving them to the spreadsheet.</p>
           </div>
-          <span class="status-pill status-pending">FINAL REVIEW</span>
         </div>
         <div id="confirmationSummary" class="student-summary"></div>
         <div class="table-wrap">
-          <table style="min-width:600px">
+          <table>
             <thead><tr><th>#</th><th>Document</th><th>Original</th><th>Xerox</th><th>Submitted By</th></tr></thead>
             <tbody id="confirmationTableBody"></tbody>
           </table>
         </div>
         <div class="btn-row">
           <button type="button" class="btn btn-soft" onclick="showPage(2)">← Edit Checklist</button>
-          <button type="button" id="saveDocumentsBtn" class="btn btn-green" onclick="saveDocumentTransaction()">✓ Save Records & Send Email</button>
+          <button type="button" id="saveDocumentsBtn" class="btn btn-primary" onclick="saveDocumentTransaction()">✓ Save Records & Send Email</button>
         </div>
       </section>
 
@@ -387,19 +302,17 @@
           <h2 style="margin:0 0 7px">Records Saved Successfully</h2>
           <p id="emailStatusText" class="tiny"></p>
         </div>
-        <div id="printableSlip" style="background:#fff;color:#152744;padding:22px;border:1px solid #dce5f3;border-radius:14px"></div>
         <div class="btn-row">
-          <button type="button" class="btn btn-soft" onclick="printReceipt()">▣ Print Receipt</button>
           <button type="button" class="btn btn-primary" onclick="resetForNextStudent()">↻ Next Student</button>
         </div>
       </section>
     </section>
 
-    <div class="footer">Admission Document Acknowledgement · Read-only preservation of previously received records</div>
+    <div style="text-align:center;padding:12px;color:#7d8ba2;font-size:10px">Admission Document Acknowledgement System</div>
   </main>
 
   <!-- REGISTER STUDENT MODAL -->
-  <div id="registerModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="registerTitle">
+  <div id="registerModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="registerTitle">
     <div class="modal">
       <div class="modal-head">
         <div><h3 id="registerTitle">Register New Student</h3><p class="tiny">Fields marked * are required.</p></div>
@@ -444,7 +357,6 @@
     let currentOperator = null;
     let selectedStudent = null;
     let documentState = [];
-    let pendingReportData = null;
 
     const $ = id => document.getElementById(id);
 
@@ -467,17 +379,6 @@
       $('globalAlert').textContent = '';
     }
 
-    function setButtonLoading(button, loading, label) {
-      if (!button) return;
-      button.disabled = loading;
-      if (loading) {
-        button.dataset.oldText = button.textContent;
-        button.innerHTML = '<span class="loader"></span> ' + escapeHtml(label || 'Please wait...');
-      } else {
-        button.textContent = button.dataset.oldText || label || 'Submit';
-      }
-    }
-
     function handleLogin(event) {
       event.preventDefault();
       hideAlert();
@@ -486,11 +387,14 @@
       if (!id || !password) return showAlert('Enter Operator ID and password.');
 
       const button = $('loginBtn');
-      setButtonLoading(button, true, 'Verifying login...');
+      button.disabled = true;
+      button.textContent = 'Verifying...';
 
       google.script.run
         .withSuccessHandler(result => {
-          setButtonLoading(button, false);
+          button.disabled = false;
+          button.textContent = 'Sign in securely →';
+          
           if (!result || !result.success) {
             showAlert((result && result.message) || 'Invalid Operator ID or password.');
             return;
@@ -510,17 +414,13 @@
           $('userNameChip').textContent = currentOperator.operatorName;
           $('roleChip').textContent = currentOperator.role.toUpperCase();
 
-          const isAdmin = currentOperator.role.trim().toLowerCase() === 'admin';
-          $('adminPendingReport').classList.toggle('hidden', !isAdmin);
-          pendingReportData = null;
-          $('downloadPendingPdfBtn').disabled = true;
-          if ($('downloadPendingExcelBtn')) $('downloadPendingExcelBtn').disabled = true;
-
           showPage(1);
           showAlert('Welcome, ' + currentOperator.operatorName + '.', 'success');
         })
         .withFailureHandler(error => {
-          setButtonLoading(button, false);
+          button.disabled = false;
+          button.textContent = 'Sign in securely →';
+          console.error('Login error:', error);
           showAlert(error && error.message ? error.message : 'Login service failed.');
         })
         .validateOperator(id, password);
@@ -530,7 +430,6 @@
       currentOperator = null;
       selectedStudent = null;
       documentState = [];
-      pendingReportData = null;
       $('appPage').classList.add('hidden');
       $('loginPage').classList.remove('hidden');
       $('userChip').classList.add('hidden');
@@ -538,19 +437,22 @@
       $('logoutBtn').classList.add('hidden');
       $('operatorPassword').value = '';
       $('searchQuery').value = '';
-      $('adminPendingReport').classList.add('hidden');
-      $('downloadPendingPdfBtn').disabled = true;
-      if ($('downloadPendingExcelBtn')) $('downloadPendingExcelBtn').disabled = true;
-      $('pendingReportTableBody').innerHTML = '<tr><td colspan="8">Generate the report to view pending students.</td></tr>';
       hideAlert();
     }
 
     function showPage(pageNumber) {
       [1,2,3,4].forEach(n => {
-        $('step' + n + 'Page').classList.toggle('hidden', n !== pageNumber);
+        const page = $('step' + n + 'Page');
         const nav = $('stepNav' + n);
-        nav.classList.toggle('active', n === pageNumber);
-        nav.classList.toggle('done', n < pageNumber);
+        if (n === pageNumber) {
+          page.classList.remove('hidden');
+          nav.classList.add('active');
+          nav.classList.remove('done');
+        } else {
+          page.classList.add('hidden');
+          nav.classList.remove('active');
+          if (n < pageNumber) nav.classList.add('done');
+        }
       });
       hideAlert();
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -563,15 +465,19 @@
       if (!query) return showAlert('Enter a Register Number or Application Number.');
 
       const button = $('searchBtn');
-      setButtonLoading(button, true, 'Searching...');
+      button.disabled = true;
+      button.textContent = 'Searching...';
 
       google.script.run
         .withSuccessHandler(student => {
-          setButtonLoading(button, false);
+          button.disabled = false;
+          button.textContent = '⌕ Search Student';
+          
           if (!student) {
-            showAlert('Student not found. Use “Register New Student” to add the student first.');
+            showAlert('Student not found. Use "Register New Student" to add the student first.');
             return;
           }
+          
           selectedStudent = {
             registerNo: student.registerNo || '',
             applicationNo: student.applicationNo || '',
@@ -580,10 +486,13 @@
             subSection: student.subSection || '',
             email: student.email || ''
           };
+          
           loadStudentDocuments();
         })
         .withFailureHandler(error => {
-          setButtonLoading(button, false);
+          button.disabled = false;
+          button.textContent = '⌕ Search Student';
+          console.error('Search error:', error);
           showAlert(error && error.message ? error.message : 'Student search failed.');
         })
         .searchStudent(query);
@@ -591,6 +500,7 @@
 
     function loadStudentDocuments() {
       if (!selectedStudent) return;
+      
       google.script.run
         .withSuccessHandler(existing => {
           const rows = Array.isArray(existing) ? existing : [];
@@ -615,10 +525,10 @@
           $('submittedBySelect').value = '';
           renderStudentSummary();
           renderDocumentsTable();
-          updateProgress();
           showPage(2);
         })
         .withFailureHandler(error => {
+          console.error('Load documents error:', error);
           showAlert(error && error.message ? error.message : 'Unable to load existing documents.');
         })
         .loadExistingDocuments(selectedStudent.applicationNo);
@@ -639,47 +549,45 @@
         return `
           <tr>
             <td>${index + 1}</td>
-            <td class="doc-name">${escapeHtml(doc.name)}</td>
-            <td class="check-cell"><input class="doc-check" type="checkbox" aria-label="${escapeHtml(doc.name)} original" ${doc.original ? 'checked' : ''} ${doc.original ? 'disabled' : ''} onchange="updateDocumentFlag(${index},'original',this.checked)"></td>
-            <td class="check-cell"><input class="doc-check" type="checkbox" aria-label="${escapeHtml(doc.name)} xerox" ${doc.xerox ? 'checked' : ''} ${doc.xerox ? 'disabled' : ''} onchange="updateDocumentFlag(${index},'xerox',this.checked)"></td>
+            <td>${escapeHtml(doc.name)}</td>
+            <td style="text-align:center"><input class="doc-check" type="checkbox" ${doc.original ? 'checked' : ''} ${doc.existed ? 'disabled' : ''} onchange="updateDocumentFlag(${index},'original',this.checked)"></td>
+            <td style="text-align:center"><input class="doc-check" type="checkbox" ${doc.xerox ? 'checked' : ''} ${doc.existed ? 'disabled' : ''} onchange="updateDocumentFlag(${index},'xerox',this.checked)"></td>
             <td><span class="status-pill ${done ? 'status-submitted' : 'status-pending'}">${done ? '✓ Submitted' : '• Pending'}</span></td>
-            <td>${escapeHtml(doc.submittedDate || '—')}</td>
-            <td>${escapeHtml(doc.submittedBy || '—')}</td>
-            <td>${escapeHtml(doc.receivedBy || '—')}</td>
+            <td>
+              <select onchange="updateSubmittedBy(${index},this.value)" ${doc.existed ? 'disabled' : ''}>
+                <option value="">Select</option>
+                <option ${doc.submittedBy==='Father'?'selected':''}>Father</option>
+                <option ${doc.submittedBy==='Mother'?'selected':''}>Mother</option>
+                <option ${doc.submittedBy==='Guardian'?'selected':''}>Guardian</option>
+                <option ${doc.submittedBy==='Student'?'selected':''}>Student</option>
+              </select>
+            </td>
           </tr>`;
       }).join('');
     }
 
     function updateDocumentFlag(index, field, checked) {
       const doc = documentState[index];
-      if (!doc || doc[field]) return;
+      if (!doc || doc.existed) return;
       doc[field] = !!checked;
-      const submittedBy = $('submittedBySelect').value.trim();
-      if (checked && submittedBy && !doc.submittedBy) doc.submittedBy = submittedBy;
       doc.status = (doc.original || doc.xerox) ? 'Submitted' : 'Pending';
       renderDocumentsTable();
-      updateProgress();
     }
 
-    function updateProgress() {
-      const complete = documentState.filter(d => d.original || d.xerox).length;
-      $('documentProgressPill').textContent = complete + ' / ' + documentState.length + ' complete';
-      $('documentProgressPill').className = 'status-pill ' + (complete === documentState.length ? 'status-submitted' : 'status-pending');
+    function updateSubmittedBy(index, value) {
+      documentState[index].submittedBy = value;
     }
 
     function backToSearch() {
       showPage(1);
+      selectedStudent = null;
+      documentState = [];
+      $('searchQuery').value = '';
     }
 
     function reviewDocuments() {
       if (!selectedStudent) return showAlert('Select a student first.');
-      const relation = $('submittedBySelect').value.trim();
-      documentState.forEach(doc => {
-        if ((doc.original || doc.xerox) && !doc.submittedBy && relation) {
-          doc.submittedBy = relation;
-        }
-      });
-
+      
       const newlySelected = documentState.filter(d => d.original || d.xerox);
       $('confirmationSummary').innerHTML = `
         <div class="summary-item"><span>Student Name</span><strong>${escapeHtml(selectedStudent.name)}</strong></div>
@@ -704,7 +612,8 @@
       }
 
       const button = $('saveDocumentsBtn');
-      setButtonLoading(button, true, 'Saving records...');
+      button.disabled = true;
+      button.textContent = 'Saving...';
 
       const payload = {
         applicationNo: String(selectedStudent.applicationNo),
@@ -718,99 +627,53 @@
           name: d.name,
           original: !!d.original,
           xerox: !!d.xerox,
-          submittedBy: d.submittedBy || $('submittedBySelect').value.trim(),
-          submittedDate: d.submittedDate || ''
+          submittedBy: d.submittedBy || ''
         }))
       };
 
       google.script.run
         .withSuccessHandler(result => {
-          setButtonLoading(button, false);
+          button.disabled = false;
+          button.textContent = '✓ Save Records & Send Email';
+          
           if (!result || !result.success) {
             showAlert((result && (result.error || result.message)) || 'Unable to save documents.');
             return;
           }
-          renderPrintableReceipt(payload);
+          
           $('emailStatusText').textContent = result.emailSent === false
-            ? 'Records saved. Email could not be sent; please check the email configuration.'
-            : (payload.email ? 'Records saved. Email acknowledgement was requested.' : 'Records saved. No email address was provided.');
+            ? 'Records saved. Email could not be sent.'
+            : (payload.email ? 'Records saved. Email acknowledgement was sent.' : 'Records saved. No email provided.');
+          
           showPage(4);
           showAlert('Document records saved successfully.', 'success');
         })
         .withFailureHandler(error => {
-          setButtonLoading(button, false);
+          button.disabled = false;
+          button.textContent = '✓ Save Records & Send Email';
+          console.error('Save error:', error);
           showAlert(error && error.message ? error.message : 'Save operation failed.');
         })
         .saveDocuments(payload);
     }
 
-    function renderPrintableReceipt(payload) {
-      const s = selectedStudent;
-      const docs = payload.documents.filter(d => d.original || d.xerox);
-      $('printableSlip').innerHTML = `
-        <div style="text-align:center;border-bottom:2px solid #173f81;padding-bottom:12px;margin-bottom:15px">
-          <div style="font-size:10px;letter-spacing:1.2px;color:#61718d;text-transform:uppercase">Admission Office</div>
-          <h2 style="margin:6px 0;font-size:18px;color:#173f81">DOCUMENT ACKNOWLEDGEMENT RECEIPT</h2>
-          <div style="font-size:11px;color:#64748b">REVA Independent PU College</div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;font-size:12px;margin-bottom:15px">
-          <div><b>Student Name:</b> ${escapeHtml(s.name)}</div>
-          <div><b>Register No:</b> ${escapeHtml(s.registerNo)}</div>
-          <div><b>Application No:</b> ${escapeHtml(s.applicationNo)}</div>
-          <div><b>Section:</b> ${escapeHtml([s.section,s.subSection].filter(Boolean).join(' / ') || '—')}</div>
-          <div><b>Date:</b> ${escapeHtml(new Date().toLocaleDateString('en-GB'))}</div>
-          <div><b>Processed By:</b> ${escapeHtml(currentOperator.operatorName)}</div>
-        </div>
-        <table style="width:100%;min-width:0;border-collapse:collapse;font-size:11px">
-          <thead><tr style="background:#eaf1fd">
-            <th style="padding:7px;border:1px solid #cbd5e1">#</th>
-            <th style="padding:7px;border:1px solid #cbd5e1;text-align:left">Document</th>
-            <th style="padding:7px;border:1px solid #cbd5e1">Original</th>
-            <th style="padding:7px;border:1px solid #cbd5e1">Xerox</th>
-            <th style="padding:7px;border:1px solid #cbd5e1;text-align:left">Submitted By</th>
-          </tr></thead>
-          <tbody>${docs.map((d,i)=>`<tr>
-            <td style="padding:7px;border:1px solid #cbd5e1;text-align:center">${i+1}</td>
-            <td style="padding:7px;border:1px solid #cbd5e1">${escapeHtml(d.name)}</td>
-            <td style="padding:7px;border:1px solid #cbd5e1;text-align:center">${d.original?'Yes':'—'}</td>
-            <td style="padding:7px;border:1px solid #cbd5e1;text-align:center">${d.xerox?'Yes':'—'}</td>
-            <td style="padding:7px;border:1px solid #cbd5e1">${escapeHtml(d.submittedBy || '—')}</td>
-          </tr>`).join('') || '<tr><td colspan="5" style="padding:10px;border:1px solid #cbd5e1;text-align:center">No newly selected documents</td></tr>'}</tbody>
-        </table>
-        <div style="display:flex;justify-content:space-between;gap:25px;margin-top:35px;font-size:11px;color:#475569">
-          <div>Signature of Parent / Student</div><div>Authorized Signature</div>
-        </div>
-        <p style="margin-top:18px;font-size:10px;color:#64748b">This acknowledgement is for college record purposes only.</p>`;
-    }
-
-    function printReceipt() {
-      const content = $('printableSlip').innerHTML;
-      const win = window.open('', '_blank', 'width=900,height=700');
-      if (!win) {
-        showAlert('Please allow pop-ups to print the receipt.');
-        return;
-      }
-      win.document.open();
-      win.document.write(`<!DOCTYPE html><html><head><title>Document Acknowledgement Receipt</title>
-        <meta name="viewport" content="width=device-width,initial-scale=1">
-        <style>
-          body{font-family:Arial,sans-serif;padding:20px;color:#172b4d}
-          table{width:100%;border-collapse:collapse;min-width:0}
-          th,td{border:1px solid #cbd5e1;padding:7px}
-          @page{size:A4;margin:14mm}
-        </style></head><body>${content}</body></html>`);
-      win.document.close();
-      win.focus();
-      win.onload = () => { win.print(); };
+    function resetForNextStudent() {
+      selectedStudent = null;
+      documentState = [];
+      $('searchQuery').value = '';
+      $('studentEmail').value = '';
+      $('submittedBySelect').value = '';
+      showPage(1);
+      $('searchQuery').focus();
     }
 
     function openRegisterModal() {
-      $('registerModal').classList.remove('hidden');
+      $('registerModal').style.display = 'flex';
       $('regNo').focus();
     }
 
     function closeRegisterModal() {
-      $('registerModal').classList.add('hidden');
+      $('registerModal').style.display = 'none';
     }
 
     function handleRegister(event) {
@@ -826,12 +689,19 @@
         email: $('stdEmail').value.trim()
       };
 
+      if (!student.registerNo || !student.applicationNo || !student.name) {
+        return showAlert('Register No, Application No and Name are required.');
+      }
+
       const button = $('registerBtn');
-      setButtonLoading(button, true, 'Registering...');
+      button.disabled = true;
+      button.textContent = 'Registering...';
 
       google.script.run
         .withSuccessHandler(result => {
-          setButtonLoading(button, false);
+          button.disabled = false;
+          button.textContent = '＋ Register Student';
+          
           if (!result || !result.success) {
             showAlert((result && result.error) || 'Student registration failed.');
             return;
@@ -839,337 +709,24 @@
 
           closeRegisterModal();
           $('registerForm').reset();
-          $('searchQuery').value = student.registerNo;
-          showAlert('Student registered successfully. Loading the student record...', 'success');
+          $('searchQuery').value = student.applicationNo;
+          showAlert('Student registered. Loading student record...', 'success');
 
-          selectedStudent = {
-            registerNo: student.registerNo,
-            applicationNo: student.applicationNo,
-            name: student.name,
-            section: student.section,
-            subSection: student.subSection,
-            email: student.email
-          };
+          selectedStudent = student;
           loadStudentDocuments();
         })
         .withFailureHandler(error => {
-          setButtonLoading(button, false);
+          button.disabled = false;
+          button.textContent = '＋ Register Student';
+          console.error('Register error:', error);
           showAlert(error && error.message ? error.message : 'Student registration failed.');
         })
         .addStudent(student);
     }
 
-    function resetForNextStudent() {
-      selectedStudent = null;
-      documentState = [];
-      $('searchQuery').value = '';
-      $('studentEmail').value = '';
-      $('submittedBySelect').value = '';
-      showPage(1);
-      $('searchQuery').focus();
-    }
-
-    /* ADMIN-ONLY PENDING REPORT */
-
-    function generateAdminPendingReport() {
-      if (!currentOperator || currentOperator.role.trim().toLowerCase() !== 'admin') {
-        showAlert('Admin login is required to access the pending report.');
-        return;
-      }
-
-      const button = $('generatePendingReportBtn');
-      const downloadButton = $('downloadPendingPdfBtn');
-      const message = $('pendingReportMessage');
-
-      pendingReportData = null;
-      downloadButton.disabled = true;
-      button.disabled = true;
-      button.innerHTML = '<span class="loader"></span> Generating...';
-      message.textContent = 'Verifying admin permission and reading pending document records...';
-
-      google.script.run
-        .withSuccessHandler(result => {
-          button.disabled = false;
-          button.textContent = '↻ Generate Report';
-
-          if (!result || !result.success) {
-            pendingReportData = null;
-            message.textContent = (result && result.message) || 'Unable to generate report.';
-            showAlert(message.textContent);
-            return;
-          }
-
-          pendingReportData = result;
-          $('pendingStudentCount').textContent = Number(result.totalStudents || 0).toLocaleString();
-          $('pendingDocumentCount').textContent = Number(result.totalPending || 0).toLocaleString();
-          downloadButton.disabled = false;
-          $('downloadPendingExcelBtn').disabled = false;
-          populatePendingSectionFilter();
-          renderPendingReportTable();
-          message.textContent = result.totalPending
-            ? 'Report ready. Select Download PDF to save the A4 landscape report.'
-            : 'No pending documents found. You can download the PDF as confirmation.';
-        })
-        .withFailureHandler(error => {
-          button.disabled = false;
-          button.textContent = '↻ Generate Report';
-          downloadButton.disabled = true;
-          pendingReportData = null;
-          message.textContent = 'Report generation failed.';
-          showAlert(error && error.message ? error.message : 'Unable to generate pending report.');
-        })
-        .getDocumentPendingReportForAdmin(currentOperator.operatorId, $('operatorPassword').value);
-    }
-
-
-    function getPendingStudents() {
-      if (!pendingReportData || !Array.isArray(pendingReportData.rows)) return [];
-      const map = new Map();
-      pendingReportData.rows.forEach(row => {
-        const key = String(row.applicationNo || row.registerNo || row.studentName);
-        if (!map.has(key)) map.set(key, {
-          registerNo: row.registerNo || '', applicationNo: row.applicationNo || '',
-          studentName: row.studentName || '', section: row.section || '',
-          subSection: row.subSection || '', email: row.email || '', documents: []
-        });
-        const student = map.get(key);
-        if (!student.documents.includes(row.documentName)) student.documents.push(row.documentName);
-        if (!student.email && row.email) student.email = row.email;
-      });
-      return Array.from(map.values()).sort((a,b) =>
-        (a.section + a.subSection + a.studentName).localeCompare(b.section + b.subSection + b.studentName));
-    }
-
-    function populatePendingSectionFilter() {
-      const select = $('pendingSectionFilter');
-      const previous = select.value;
-      const sections = [...new Set(getPendingStudents().map(s =>
-        [s.section, s.subSection].filter(Boolean).join(' / ') || 'Unassigned'))].sort();
-      select.innerHTML = '<option value="">All Sections</option>' +
-        sections.map(v => '<option value="' + escapeHtml(v) + '">' + escapeHtml(v) + '</option>').join('');
-      if (sections.includes(previous)) select.value = previous;
-    }
-
-    function getFilteredPendingStudents() {
-      const section = $('pendingSectionFilter').value;
-      const query = $('pendingStudentFilter').value.trim().toLowerCase();
-      return getPendingStudents().filter(s => {
-        const sec = [s.section, s.subSection].filter(Boolean).join(' / ') || 'Unassigned';
-        const sectionMatch = !section || sec === section;
-        const haystack = [s.registerNo,s.applicationNo,s.studentName,s.email,sec].join(' ').toLowerCase();
-        return sectionMatch && (!query || haystack.includes(query));
-      });
-    }
-
-    function renderPendingReportTable() {
-      const body = $('pendingReportTableBody');
-      if (!pendingReportData) return;
-      const students = getFilteredPendingStudents();
-      if (!students.length) {
-        body.innerHTML = '<tr><td colspan="8">No pending students match this filter.</td></tr>';
-        return;
-      }
-      body.innerHTML = students.map((s,i) => {
-        const sec = [s.section,s.subSection].filter(Boolean).join(' / ') || 'Unassigned';
-        const emailButton = s.email
-          ? '<button type="button" class="btn btn-soft" onclick="sendIndividualPendingReminder(' + JSON.stringify(s.applicationNo).replace(/</g,'\\u003c') + ',this)">✉ Send Reminder</button>'
-          : '<span class="tiny">Email missing</span>';
-        return '<tr><td>'+(i+1)+'</td><td>'+escapeHtml(s.registerNo||'—')+'</td><td>'+
-          escapeHtml(s.applicationNo||'—')+'</td><td>'+escapeHtml(s.studentName||'—')+'</td><td>'+
-          escapeHtml(sec)+'</td><td>'+s.documents.length+'<details><summary>View list</summary><ul>'+
-          s.documents.map(d=>'<li>'+escapeHtml(d)+'</li>').join('')+'</ul></details></td><td>'+
-          escapeHtml(s.email||'—')+'</td><td>'+emailButton+'</td></tr>';
-      }).join('');
-    }
-
-    function downloadPendingReportExcel() {
-      if (!currentOperator || currentOperator.role.trim().toLowerCase() !== 'admin' || !pendingReportData) {
-        showAlert('Generate the report after administrator login.'); return;
-      }
-      const rows = getFilteredPendingStudents();
-      const csvCell = value => '"' + String(value == null ? '' : value).replace(/"/g,'""') + '"';
-      const csv = [
-        ['Sl. No.','Register No.','Application No.','Student Name','Section','Pending Document List','Pending Count','Email'],
-        ...rows.map((s,i)=>[i+1,s.registerNo,s.applicationNo,s.studentName,
-          [s.section,s.subSection].filter(Boolean).join(' / '),s.documents.join('; '),s.documents.length,s.email])
-      ].map(row=>row.map(csvCell).join(',')).join('\r\n');
-      const blob = new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8;'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'Document_Pending_Report_' + new Date().toISOString().slice(0,10) + '.csv';
-      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-      $('pendingReportMessage').textContent = 'Excel-compatible report downloaded for the selected section/filter.';
-    }
-
-    function sendIndividualPendingReminder(applicationNo, button) {
-      if (!currentOperator || currentOperator.role.trim().toLowerCase() !== 'admin') {
-        showAlert('Admin login is required to send reminders.'); return;
-      }
-      if (!applicationNo) { showAlert('Application No is missing for this student.'); return; }
-      if (!confirm('Send a pending-document reminder email to this student?')) return;
-      const oldText = button.textContent;
-      button.disabled = true; button.textContent = 'Sending...';
-      google.script.run
-        .withSuccessHandler(result => {
-          button.disabled = false; button.textContent = oldText;
-          if (result && result.success) {
-            $('pendingReportMessage').textContent = result.message;
-            showAlert(result.message, 'success');
-          } else {
-            const msg = result && result.message || 'Unable to send reminder email.';
-            $('pendingReportMessage').textContent = msg; showAlert(msg);
-          }
-        })
-        .withFailureHandler(error => {
-          button.disabled = false; button.textContent = oldText;
-          showAlert(error && error.message || 'Reminder email failed.');
-        })
-        .sendPendingDocumentReminderForAdmin(currentOperator.operatorId, $('operatorPassword').value, applicationNo);
-    }
-
-    // Load PDF dependencies on demand. Multiple CDNs are tried because a network,
-    // browser extension, or institutional firewall may block a particular host.
-    function loadScriptFromAny(urls) {
-      return new Promise((resolve, reject) => {
-        let index = 0;
-        const tryNext = () => {
-          if (index >= urls.length) {
-            reject(new Error('Could not load PDF dependency from the available CDNs.'));
-            return;
-          }
-          const script = document.createElement('script');
-          script.src = urls[index++];
-          script.async = true;
-          script.onload = () => resolve();
-          script.onerror = () => { script.remove(); tryNext(); };
-          document.head.appendChild(script);
-        };
-        tryNext();
-      });
-    }
-
-    let pdfLibrariesPromise = null;
-    function ensurePdfLibraries() {
-      if (window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API && window.jspdf.jsPDF.API.autoTable) {
-        return Promise.resolve();
-      }
-      if (pdfLibrariesPromise) return pdfLibrariesPromise;
-      pdfLibrariesPromise = (async () => {
-        if (!window.jspdf || !window.jspdf.jsPDF) {
-          await loadScriptFromAny([
-            'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js',
-            'https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js',
-            'https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js'
-          ]);
-        }
-        if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('jsPDF did not initialize.');
-        if (!window.jspdf.jsPDF.API.autoTable) {
-          await loadScriptFromAny([
-            'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js',
-            'https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js',
-            'https://unpkg.com/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js'
-          ]);
-        }
-        if (!window.jspdf.jsPDF.API.autoTable) throw new Error('AutoTable plugin did not initialize.');
-      })().catch(error => {
-        pdfLibrariesPromise = null;
-        throw error;
-      });
-      return pdfLibrariesPromise;
-    }
-
-    async function downloadPendingReportPDF() {
-      if (!currentOperator || currentOperator.role.trim().toLowerCase() !== 'admin' || !pendingReportData) {
-        showAlert('Generate the report after administrator login.');
-        return;
-      }
-      const button = $('downloadPendingPdfBtn');
-      const originalLabel = button ? button.textContent : '↓ Download PDF';
-      if (button) { button.disabled = true; button.textContent = 'Loading PDF tools…'; }
-      try {
-        await ensurePdfLibraries();
-      } catch (error) {
-        showAlert('Unable to load the PDF tools. Check your internet connection or network restrictions, then try again. If this continues, ask the portal developer to bundle the PDF libraries inside the project.');
-        if (button) { button.disabled = false; button.textContent = originalLabel; }
-        console.error('PDF library loading error:', error);
-        return;
-      }
-      if (button) { button.textContent = originalLabel; button.disabled = false; }
-
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
-      const report = pendingReportData;
-      const filteredStudents = getFilteredPendingStudents();
-      const rows = [];
-      filteredStudents.forEach(student => student.documents.forEach(documentName => rows.push({
-        registerNo: student.registerNo,
-        applicationNo: student.applicationNo,
-        studentName: student.studentName,
-        section: student.section,
-        subSection: student.subSection,
-        documentName: documentName
-      })));
-      const pageWidth = pdf.internal.pageSize.getWidth();
-
-      pdf.setFont('helvetica','bold');
-      pdf.setFontSize(16);
-      pdf.text('DOCUMENT PENDING REPORT', pageWidth / 2, 14, { align:'center' });
-      pdf.setFont('helvetica','normal');
-      pdf.setFontSize(9);
-      pdf.text('REVA Independent PU College · Admission Document Acknowledgement', pageWidth / 2, 20, { align:'center' });
-      pdf.setFontSize(8);
-      pdf.text('Generated: ' + (report.generatedAt || ''), 12, 28);
-      pdf.text('Students With Pending Documents: ' + filteredStudents.length, 12, 33);
-      pdf.text('Pending Document Entries: ' + rows.length, 12, 38);
-
-      const body = rows.map((row,index) => [
-        index + 1,
-        row.registerNo || '—',
-        row.applicationNo || '—',
-        row.studentName || '—',
-        [row.section,row.subSection].filter(Boolean).join(' / ') || '—',
-        row.documentName || '—'
-      ]);
-
-      pdf.autoTable({
-        startY:43,
-        head:[['Sl. No.','Register No.','Application No.','Student Name','Section','Pending Document']],
-        body:body.length ? body : [['','','','No pending documents found.','','']],
-        theme:'grid',
-        margin:{left:12,right:12,bottom:15},
-        styles:{font:'helvetica',fontSize:8,cellPadding:2.4,overflow:'linebreak',valign:'middle'},
-        headStyles:{fillColor:[22,61,123],textColor:[255,255,255],fontStyle:'bold'},
-        alternateRowStyles:{fillColor:[240,245,253]},
-        columnStyles:{
-          0:{cellWidth:13},
-          1:{cellWidth:30},
-          2:{cellWidth:32},
-          3:{cellWidth:54},
-          4:{cellWidth:30},
-          5:{cellWidth:'auto'}
-        },
-        didDrawPage:function() {
-          const h = pdf.internal.pageSize.getHeight();
-          const w = pdf.internal.pageSize.getWidth();
-          const page = pdf.internal.getNumberOfPages();
-          pdf.setFont('helvetica','normal');
-          pdf.setFontSize(7.5);
-          pdf.text('CONFIDENTIAL — FOR COLLEGE ADMINISTRATION USE ONLY',12,h-7);
-          pdf.text('Page ' + page,w-12,h-7,{align:'right'});
-        }
-      });
-
-      const date = new Date().toISOString().slice(0,10);
-      pdf.save('Document_Pending_Report_' + date + '.pdf');
-    }
-
-    // Close modal when the shaded background is clicked.
+    // Modal close on backdrop click
     $('registerModal').addEventListener('click', event => {
       if (event.target === $('registerModal')) closeRegisterModal();
-    });
-    document.addEventListener('keydown', event => {
-      if (event.key === 'Escape') closeRegisterModal();
     });
   </script>
 </body>
